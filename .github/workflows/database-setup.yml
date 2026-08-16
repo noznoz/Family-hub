@@ -1,0 +1,57 @@
+name: Database setup
+
+# Applies the Family Hub database to your Supabase project.
+# Runs on GitHub's runners (which can reach Supabase) so it can be triggered
+# for you. Requires one repository secret: SUPABASE_DB_URL (a Postgres
+# connection string — use the Supabase "Session pooler" URI with your DB password).
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_seed:
+        description: 'Also load demo seed data (safe to remove later)'
+        type: boolean
+        default: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Verify secret is set
+        run: |
+          if [ -z "${{ secrets.SUPABASE_DB_URL }}" ]; then
+            echo "::error::SUPABASE_DB_URL secret is not set. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "Secret present."
+
+      - name: Apply schema, RLS, reference data, storage
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "Applying supabase/all_in_one.sql ..."
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/all_in_one.sql
+          echo "✅ Database schema + RLS applied."
+
+      - name: Load seed data (optional)
+        if: ${{ inputs.run_seed }}
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "Loading supabase/seed.sql ..."
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
+          echo "✅ Seed data loaded."
+
+      - name: Summary
+        run: |
+          psql "${{ secrets.SUPABASE_DB_URL }}" -tA -c "select 'Tables created: '||count(*) from information_schema.tables where table_schema='public';"
+          psql "${{ secrets.SUPABASE_DB_URL }}" -tA -c "select 'RLS policies: '||count(*) from pg_policies where schemaname='public';"
+          echo "Done."
