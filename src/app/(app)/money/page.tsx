@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
+import { Lock } from 'lucide-react';
 import { getSessionUser } from '@/lib/session';
 import { can } from '@/lib/permissions';
+import { getExpenses, getPaymentRequests } from '@/lib/queries';
 import { demoBudgets, demoExpenses, demoRequests } from '@/lib/demo-data';
 import { MoneyView } from '@/components/money/money-view';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Lock } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Money' };
 
@@ -16,7 +17,6 @@ export default async function MoneyPage() {
   const canViewFinances = can(member.role, 'view_student_finances');
   const canApprove = can(member.role, 'approve_payment_requests');
 
-  // Students see only their own money; family members without finance perms see nothing sensitive.
   if (!canViewFinances && member.role !== 'student') {
     return (
       <div className="space-y-4">
@@ -32,11 +32,21 @@ export default async function MoneyPage() {
 
   const onlyStudent = member.role === 'student' ? (member.displayName as 'Hamza' | 'Omar') : null;
 
+  const [expenses, requests] = session.isDemo
+    ? [
+        onlyStudent ? demoExpenses.filter((e) => e.student === onlyStudent) : demoExpenses,
+        onlyStudent ? demoRequests.filter((r) => r.student === onlyStudent) : demoRequests,
+      ]
+    : await Promise.all([
+        getExpenses(session.familyId, onlyStudent ?? undefined),
+        getPaymentRequests(session.familyId, onlyStudent ?? undefined),
+      ]);
+
   return (
     <MoneyView
       budgets={demoBudgets}
-      expenses={demoExpenses}
-      requests={demoRequests}
+      expenses={expenses}
+      requests={requests}
       onlyStudent={onlyStudent}
       canApprove={canApprove}
     />

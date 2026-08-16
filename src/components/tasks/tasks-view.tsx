@@ -1,12 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { Plus, Check } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
+import { setTaskStatus } from '@/lib/actions/tasks';
+import { TaskCreateDialog } from './task-create-dialog';
 import type { Task, TaskPriority, TaskStatus } from '@/lib/types';
 
 const FILTERS = ['My Tasks', 'Hamza', 'Omar', 'Family', 'Completed'] as const;
@@ -19,9 +21,20 @@ const priorityTone: Record<TaskPriority, 'neutral' | 'attention' | 'danger'> = {
 };
 const statusLabel: Record<TaskStatus, string> = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' };
 
-export function TasksView({ tasks: initial }: { tasks: Task[] }) {
+export function TasksView({
+  tasks: initial,
+  live,
+  students,
+  members,
+}: {
+  tasks: Task[];
+  live: boolean;
+  students: { id: string; name: string }[];
+  members: { id: string; name: string }[];
+}) {
   const [tasks, setTasks] = useState(initial);
   const [filter, setFilter] = useState<Filter>('My Tasks');
+  const [, startTransition] = useTransition();
 
   const filtered = useMemo(() => {
     switch (filter) {
@@ -38,16 +51,31 @@ export function TasksView({ tasks: initial }: { tasks: Task[] }) {
     }
   }, [tasks, filter]);
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    let next: TaskStatus = 'todo';
     setTasks((ts) =>
-      ts.map((t) => (t.id === id ? { ...t, status: t.status === 'done' ? 'todo' : 'done' } : t)),
+      ts.map((t) => {
+        if (t.id !== id) return t;
+        next = t.status === 'done' ? 'todo' : 'done';
+        return { ...t, status: next };
+      }),
     );
+    if (live) startTransition(() => void setTaskStatus(id, next));
+  };
+
+  const onCreated = (t: Task) => setTasks((ts) => [t, ...ts]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold tracking-tight text-navy">Tasks</h1>
-        <Button variant="brand" size="sm"><Plus className="size-4" /> New</Button>
+        <TaskCreateDialog
+          live={live}
+          students={students}
+          members={members}
+          onCreated={onCreated}
+          trigger={<Button variant="brand" size="sm"><Plus className="size-4" /> New</Button>}
+        />
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">

@@ -7,8 +7,13 @@ import type { Member } from '@/lib/types';
 
 export const DEMO_COOKIE = 'fh_demo_member';
 
+/** Stable demo family id (matches supabase/seed.sql). */
+export const DEMO_FAMILY_ID = '11111111-1111-1111-1111-111111111111';
+
 export interface SessionUser {
   member: Member;
+  familyId: string;
+  memberId: string;
   isDemo: boolean;
 }
 
@@ -30,7 +35,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 
     const { data } = await supabase
       .from('family_members')
-      .select('id, display_name, role, is_student, profile:profiles(avatar_url)')
+      .select('id, family_id, display_name, role, is_student, profile:profiles(avatar_url)')
       .eq('profile_id', user.id)
       .eq('status', 'active')
       .maybeSingle();
@@ -38,6 +43,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     if (!data) return null;
     return {
       isDemo: false,
+      familyId: data.family_id,
+      memberId: data.id,
       member: {
         id: data.id,
         displayName: data.display_name,
@@ -52,5 +59,5 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const store = await cookies();
   const id = store.get(DEMO_COOKIE)?.value ?? 'd';
   const member = demoMembers.find((m) => m.id === id) ?? demoMembers[0]!;
-  return { isDemo: true, member };
+  return { isDemo: true, familyId: DEMO_FAMILY_ID, memberId: member.id, member };
 }
