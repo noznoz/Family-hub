@@ -23,6 +23,15 @@ function nameFromEmail(email: string | undefined): string {
  * permissions yet) can be bootstrapped safely on the server.
  */
 export async function ensureMembership(): Promise<OnboardResult> {
+  try {
+    return await ensureMembershipInner();
+  } catch (e) {
+    console.error('[ensureMembership] failed:', e instanceof Error ? e.message : String(e));
+    return 'error';
+  }
+}
+
+async function ensureMembershipInner(): Promise<OnboardResult> {
   const supabase = await createClient();
   if (!supabase) return 'error';
   const {
