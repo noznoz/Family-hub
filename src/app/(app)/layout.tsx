@@ -7,7 +7,8 @@ import { OfflineIndicator } from '@/components/pwa/offline-indicator';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSessionUser();
-  if (!session) redirect('/login');
+  // Authenticated but not yet linked to a family member → run onboarding.
+  if (!session) redirect('/welcome');
 
   return (
     <div className="flex min-h-dvh">

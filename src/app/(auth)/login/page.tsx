@@ -5,7 +5,7 @@ import { demoMembers } from '@/lib/demo-data';
 import { Card } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Chip } from '@/components/ui/chip';
-import { LoginForm } from './login-form';
+import { AuthForm } from './auth-form';
 import { demoLogin } from './actions';
 
 export const metadata: Metadata = { title: 'Sign in' };
@@ -22,13 +22,12 @@ export default function LoginPage() {
       </div>
 
       {isSupabaseConfigured ? (
-        <LoginForm />
+        <AuthForm />
       ) : (
         <div className="space-y-4">
           <div className="rounded-2xl bg-brand-muted px-4 py-3 text-sm text-navy">
             <span className="font-semibold">Demo mode.</span> Supabase isn&apos;t connected, so
-            pick a family member to explore the app. Add your keys in <code>.env.local</code> to
-            enable real sign-in.
+            pick a family member to explore the app.
           </div>
           <p className="px-1 text-sm font-semibold text-navy">Who are you?</p>
           <div className="grid grid-cols-1 gap-2">
