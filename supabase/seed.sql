@@ -57,7 +57,7 @@ on conflict (id) do nothing;
 
 insert into public.scholarships (id, student_id, funding_id, sponsor, scholarship_ref, stage, start_date, allowance_note) values
   ('66666666-6666-6666-6666-666666666606','44444444-4444-4444-4444-444444444406','55555555-5555-5555-5555-555555555506','Ministry of Education','GS-2026-HAMZA','active','2026-01-01','Monthly living allowance + tuition covered'),
-  ('66666666-6666-6666-6666-666666666607','44444444-4444-4444-4444-444444444407','55555555-5555-5555-5555-555555555507','—','family_funded','2026-01-01',null)
+  ('66666666-6666-6666-6666-666666666607','44444444-4444-4444-4444-444444444407','55555555-5555-5555-5555-555555555507','—',null,'family_funded','2026-01-01',null)
 on conflict (id) do nothing;
 
 insert into public.scholarship_requirements (scholarship_id, title, kind, due_date, completed) values
