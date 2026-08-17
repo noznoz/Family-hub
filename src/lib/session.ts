@@ -32,9 +32,13 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
   if (isSupabaseConfigured) {
     const supabase = await createClient();
     if (!supabase) return null;
+    // getSession() reads the JWT from cookies locally (no network round-trip).
+    // Middleware already validated/refreshed it via getUser(), and PostgREST
+    // re-verifies the token on every query, so this is safe and much faster.
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) return null;
 
     // No profiles join here: it's unused in the shell and an embed error would
