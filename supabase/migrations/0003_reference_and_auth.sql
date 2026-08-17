@@ -112,3 +112,14 @@ create policy "media delete own family"
   on storage.objects for delete to authenticated
   using (bucket_id = 'media'
          and public.is_family_member((split_part(name,'/',1))::uuid));
+
+-- ── Realtime: broadcast new chat messages (+ reactions/reads) ─────────────────
+do $$
+begin
+  begin
+    alter publication supabase_realtime add table public.messages;
+  exception when duplicate_object then null; when undefined_object then null; end;
+  begin
+    alter publication supabase_realtime add table public.message_reactions;
+  exception when duplicate_object then null; when undefined_object then null; end;
+end $$;
