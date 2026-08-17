@@ -26,3 +26,22 @@ export async function uploadMedia(
   }
   return path;
 }
+
+/** Upload a document to the private documents bucket under the family folder. */
+export async function uploadDocument(
+  familyId: string,
+  file: File,
+  subpath: string,
+): Promise<string | null> {
+  const supabase = createClient();
+  if (!supabase) return null;
+  const path = `${familyId}/${subpath}`;
+  const { error } = await supabase.storage
+    .from(env.NEXT_PUBLIC_SUPABASE_DOCS_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) {
+    console.error('[uploadDocument]', error.message);
+    return null;
+  }
+  return path;
+}
