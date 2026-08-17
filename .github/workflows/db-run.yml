@@ -1,0 +1,36 @@
+name: DB run
+# Runs a chosen SQL file from supabase/ against the Supabase DB, on demand.
+# Requires repo secret SUPABASE_DB_URL (Session-pooler connection string).
+on:
+  workflow_dispatch:
+    inputs:
+      file:
+        description: 'SQL file under supabase/ to run (e.g. diagnose.sql)'
+        type: string
+        default: 'diagnose.sql'
+      stop_on_error:
+        description: 'Abort on first SQL error'
+        type: boolean
+        default: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Run SQL
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL secret is not set. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          FILE="supabase/${{ inputs.file }}"
+          echo "Running $FILE"
+          if [ "${{ inputs.stop_on_error }}" = "true" ]; then
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$FILE"
+          else
+            psql "$DB_URL" -v ON_ERROR_STOP=0 -f "$FILE"
+          fi
