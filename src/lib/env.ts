@@ -34,10 +34,13 @@ const parsed = schema.safeParse({
 
 const raw = parsed.success ? parsed.data : {};
 
+/** Strip trailing slashes so `${url}/auth/...` never becomes a double slash. */
+const trimSlash = (v: string | undefined) => v?.replace(/\/+$/, '');
+
 export const env = {
-  NEXT_PUBLIC_APP_URL: raw.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
-  NEXT_PUBLIC_PRODUCTION_DOMAIN: raw.NEXT_PUBLIC_PRODUCTION_DOMAIN ?? '',
-  NEXT_PUBLIC_SUPABASE_URL: raw.NEXT_PUBLIC_SUPABASE_URL,
+  NEXT_PUBLIC_APP_URL: trimSlash(raw.NEXT_PUBLIC_APP_URL) ?? 'http://localhost:3000',
+  NEXT_PUBLIC_PRODUCTION_DOMAIN: trimSlash(raw.NEXT_PUBLIC_PRODUCTION_DOMAIN) ?? '',
+  NEXT_PUBLIC_SUPABASE_URL: trimSlash(raw.NEXT_PUBLIC_SUPABASE_URL),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: raw.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   NEXT_PUBLIC_SUPABASE_DOCS_BUCKET: raw.NEXT_PUBLIC_SUPABASE_DOCS_BUCKET ?? 'documents',
   NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET: raw.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET ?? 'media',
