@@ -288,15 +288,25 @@ create policy "preq update" on public.payment_requests for update using (
 );
 
 -- ── DOCUMENTS (private; visibility rules) ─────────────────────────────────────
+-- SECURITY DEFINER so checking document_shares here does NOT trigger the
+-- document_shares policy (which reads documents) — that mutual reference would
+-- otherwise cause infinite recursion (42P17) on any documents read.
+create or replace function public.doc_shared_with_me(doc uuid)
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.document_shares ds
+    join public.family_members fm on fm.id = ds.member_id
+    where ds.document_id = doc and fm.profile_id = auth.uid()
+  );
+$$;
+
 create policy "doc read" on public.documents for select using (
   public.has_perm(family_id,'manage_documents')
   or (visibility = 'entire_family' and public.has_perm(family_id,'view_documents'))
   or (visibility = 'parents_admins' and public.is_parent_admin(family_id))
   or (visibility = 'private_student' and public.owns_student(student_id))
-  or (visibility = 'selected_members' and exists (
-        select 1 from public.document_shares ds
-        join public.family_members fm on fm.id = ds.member_id
-        where ds.document_id = public.documents.id and fm.profile_id = auth.uid()))
+  or (visibility = 'selected_members' and public.doc_shared_with_me(id))
 );
 create policy "doc write" on public.documents for all using (public.has_perm(family_id,'manage_documents')) with check (public.has_perm(family_id,'manage_documents'));
 
