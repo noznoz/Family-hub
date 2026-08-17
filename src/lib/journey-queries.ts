@@ -145,3 +145,24 @@ export async function getCalendar(familyId: string): Promise<CalEvent[]> {
     student: one<{ member: { display_name: string } | null }>(e.student)?.member?.display_name ?? null,
   }));
 }
+
+// ── Notifications ────────────────────────────────────────────────────────────
+export interface NotificationView { id: string; kind: string; title: string; body: string; when: string; unread: boolean }
+export async function getNotifications(memberId: string): Promise<NotificationView[]> {
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from('notifications')
+    .select('id, kind, title, body, read_at, created_at')
+    .eq('recipient_id', memberId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  return (data ?? []).map((n) => ({
+    id: n.id,
+    kind: n.kind,
+    title: n.title,
+    body: n.body ?? '',
+    when: new Date(n.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+    unread: !n.read_at,
+  }));
+}
