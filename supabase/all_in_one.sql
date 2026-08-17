@@ -784,8 +784,11 @@ begin
     'support_categories','support_guides','support_steps','support_media','support_audio',
     'recipes','recipe_ingredients','recipe_steps','recipe_media','recipe_favorites','audit_logs'
   ] loop
+    -- ENABLE (not FORCE): FORCE would subject the table owner to RLS too, which
+    -- makes SECURITY DEFINER helper policies recurse infinitely on managed
+    -- Postgres (where the owner is not a superuser). ENABLE fully protects the
+    -- anon/authenticated roles the app actually uses.
     execute format('alter table public.%I enable row level security;', t);
-    execute format('alter table public.%I force row level security;', t);
   end loop;
 end $$;
 
