@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/env';
@@ -23,8 +24,11 @@ export interface SessionUser {
  * - With Supabase configured: reads the authed user and their family_members row.
  * - In demo mode (no backend): reads a cookie chosen on the demo login screen,
  *   defaulting to Dad, so first-run role routing can be demonstrated.
+ *
+ * Wrapped in React cache() so the layout and the page share ONE auth check +
+ * query per request instead of repeating the ~round-trip several times.
  */
-export async function getSessionUser(): Promise<SessionUser | null> {
+export const getSessionUser = cache(async function getSessionUser(): Promise<SessionUser | null> {
   if (isSupabaseConfigured) {
     const supabase = await createClient();
     if (!supabase) return null;
@@ -65,4 +69,4 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const id = store.get(DEMO_COOKIE)?.value ?? 'd';
   const member = demoMembers.find((m) => m.id === id) ?? demoMembers[0]!;
   return { isDemo: true, familyId: DEMO_FAMILY_ID, memberId: member.id, member };
-}
+});
