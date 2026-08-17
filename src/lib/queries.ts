@@ -62,32 +62,38 @@ interface StudentRow {
 }
 
 export async function getStudents(familyId: string): Promise<StudentSummary[]> {
-  const supabase = await createClient();
-  if (!supabase) return [];
-  const { data } = await supabase
-    .from('student_profiles')
-    .select('id, member_id, course, overall_status, status, member:family_members!student_profiles_member_id_fkey(display_name), university:universities(name)')
-    .eq('family_id', familyId);
+  try {
+    const supabase = await createClient();
+    if (!supabase) return [];
+    const { data } = await supabase
+      .from('student_profiles')
+      .select('id, member_id, course, overall_status, status, member:family_members!student_profiles_member_id_fkey(display_name), university:universities(name)')
+      .eq('family_id', familyId);
 
-  const rows = (data ?? []) as unknown as StudentRow[];
-  const students = await Promise.all(rows.map((r) => enrichStudent(r)));
-  return students;
+    const rows = (data ?? []) as unknown as StudentRow[];
+    return await Promise.all(rows.map((r) => enrichStudent(supabase, r)));
+  } catch (e) {
+    console.error('[getStudents] failed:', e instanceof Error ? e.message : String(e));
+    return [];
+  }
 }
 
-async function enrichStudent(r: StudentRow): Promise<StudentSummary> {
-  const supabase = await createClient();
+async function enrichStudent(
+  supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>,
+  r: StudentRow,
+): Promise<StudentSummary> {
   const name = r.member?.display_name ?? 'Student';
 
   const [yearRes, fundingRes, taskRes, tripRes, reqRes] = await Promise.all([
-    supabase!.from('academic_years').select('label, study_year')
+    supabase.from('academic_years').select('label, study_year')
       .eq('student_id', r.id).eq('status', 'active').limit(1).maybeSingle(),
-    supabase!.from('funding_sources').select('label, kind')
+    supabase.from('funding_sources').select('label, kind')
       .eq('student_id', r.id).eq('status', 'active').order('start_date', { ascending: false }).limit(1).maybeSingle(),
-    supabase!.from('tasks').select('title, due_date')
+    supabase.from('tasks').select('title, due_date')
       .eq('student_id', r.id).neq('status', 'done').order('due_date', { ascending: true }).limit(1).maybeSingle(),
-    supabase!.from('trip_members').select('trip:trips(title, depart_at)')
+    supabase.from('trip_members').select('trip:trips(title, depart_at)')
       .eq('member_id', r.member_id).limit(5),
-    supabase!.from('payment_requests').select('reason, amount, currency, created_at')
+    supabase.from('payment_requests').select('reason, amount, currency, created_at')
       .eq('student_id', r.id).eq('status', 'requested').order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ]);
 
@@ -141,6 +147,15 @@ export async function getTasks(familyId: string): Promise<Task[]> {
 }
 
 export async function getAttention(familyId: string): Promise<AttentionItem[]> {
+  try {
+    return await getAttentionInner(familyId);
+  } catch (e) {
+    console.error('[getAttention] failed:', e instanceof Error ? e.message : String(e));
+    return [];
+  }
+}
+
+async function getAttentionInner(familyId: string): Promise<AttentionItem[]> {
   const supabase = await createClient();
   if (!supabase) return [];
   const items: AttentionItem[] = [];
