@@ -33,13 +33,18 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const { data } = await supabase
+    // No profiles join here: it's unused in the shell and an embed error would
+    // make the whole query fail (returning null → endless redirect to /welcome).
+    const { data, error } = await supabase
       .from('family_members')
-      .select('id, family_id, display_name, role, is_student, profile:profiles(avatar_url)')
+      .select('id, family_id, display_name, role, is_student')
       .eq('profile_id', user.id)
       .eq('status', 'active')
       .maybeSingle();
 
+    if (error) {
+      console.error('[getSessionUser] members query error:', error.code, error.message);
+    }
     if (!data) return null;
     return {
       isDemo: false,
@@ -50,7 +55,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
         displayName: data.display_name,
         role: data.role as SystemRole,
         isStudent: data.is_student,
-        avatarUrl: (data.profile as { avatar_url?: string } | null)?.avatar_url ?? null,
+        avatarUrl: null,
       },
     };
   }
