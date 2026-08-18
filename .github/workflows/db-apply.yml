@@ -1,7 +1,4 @@
 name: DB apply
-# Applies schema + RLS + reference data + seed to the Supabase DB in the
-# SUPABASE_DB_URL secret. Runs when .github/db-apply.trigger changes (a push
-# marker) or via manual dispatch. Idempotent (reset_and_setup handles re-runs).
 on:
   push:
     branches: ['claude/family-hub-pwa-build-j1eivv']
@@ -14,29 +11,30 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install psql
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
-      - name: Apply schema, RLS, reference data
+      - name: Connectivity check
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          if [ -z "$DB_URL" ]; then
-            echo "::error::SUPABASE_DB_URL secret is not set."
+          if [ -z "$DB_URL" ]; then echo "::error::SUPABASE_DB_URL secret is not set."; exit 1; fi
+          HOST=$(echo "$DB_URL" | sed -E 's#.*@([^:/]+).*#\1#')
+          USERPART=$(echo "$DB_URL" | sed -E 's#postgresql://([^:]+):.*#\1#')
+          echo "Host: $HOST"
+          echo "User: $USERPART"
+          echo "::notice::Connecting to host=$HOST user=$USERPART"
+          set +e
+          OUT=$(psql "$DB_URL" -c "select 1 as ok" 2>&1)
+          CODE=$?
+          set -e
+          if [ $CODE -ne 0 ]; then
+            MSG=$(echo "$OUT" | grep -iE 'psql:|error|fatal|could not|authentication|host|timeout' | head -2 | tr '\n' ' ')
+            echo "::error::Cannot connect (exit $CODE) to host=$HOST — $MSG"
             exit 1
           fi
-          echo "Applying reset_and_setup.sql ..."
+          echo "::notice::Connection OK"
+      - name: Apply schema, RLS, reference data, seed
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
           psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/reset_and_setup.sql
-          echo "✅ schema + RLS applied"
-      - name: Load seed data
-        env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          echo "Applying seed.sql ..."
           psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
-          echo "✅ seed loaded"
-      - name: Summary
-        env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          psql "$DB_URL" -tA -c "select 'Tables: '||count(*) from information_schema.tables where table_schema='public';"
-          psql "$DB_URL" -tA -c "select 'RLS policies: '||count(*) from pg_policies where schemaname='public';"
-          psql "$DB_URL" -tA -c "select 'Family members: '||count(*) from public.family_members;"
-          psql "$DB_URL" -tA -c "select 'Students: '||count(*) from public.student_profiles;"
+          echo "::notice::$(psql "$DB_URL" -tA -c "select 'tables='||count(*)||' policies='||(select count(*) from pg_policies where schemaname='public')||' members='||(select count(*) from public.family_members) from information_schema.tables where table_schema='public' limit 1;")"
