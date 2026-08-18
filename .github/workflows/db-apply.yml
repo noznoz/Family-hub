@@ -1,0 +1,42 @@
+name: DB apply
+# Applies schema + RLS + reference data + seed to the Supabase DB in the
+# SUPABASE_DB_URL secret. Runs when .github/db-apply.trigger changes (a push
+# marker) or via manual dispatch. Idempotent (reset_and_setup handles re-runs).
+on:
+  push:
+    branches: ['claude/family-hub-pwa-build-j1eivv']
+    paths: ['.github/db-apply.trigger']
+  workflow_dispatch:
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Apply schema, RLS, reference data
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL secret is not set."
+            exit 1
+          fi
+          echo "Applying reset_and_setup.sql ..."
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/reset_and_setup.sql
+          echo "✅ schema + RLS applied"
+      - name: Load seed data
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          echo "Applying seed.sql ..."
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
+          echo "✅ seed loaded"
+      - name: Summary
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$DB_URL" -tA -c "select 'Tables: '||count(*) from information_schema.tables where table_schema='public';"
+          psql "$DB_URL" -tA -c "select 'RLS policies: '||count(*) from pg_policies where schemaname='public';"
+          psql "$DB_URL" -tA -c "select 'Family members: '||count(*) from public.family_members;"
+          psql "$DB_URL" -tA -c "select 'Students: '||count(*) from public.student_profiles;"
