@@ -11,30 +11,24 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install psql
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
-      - name: Connectivity check
+      - name: Apply everything
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          RAW_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          if [ -z "$DB_URL" ]; then echo "::error::SUPABASE_DB_URL secret is not set."; exit 1; fi
-          HOST=$(echo "$DB_URL" | sed -E 's#.*@([^:/]+).*#\1#')
-          USERPART=$(echo "$DB_URL" | sed -E 's#postgresql://([^:]+):.*#\1#')
-          echo "Host: $HOST"
-          echo "User: $USERPART"
-          echo "::notice::Connecting to host=$HOST user=$USERPART"
+          if [ -z "$RAW_DB_URL" ]; then echo "::error::SUPABASE_DB_URL secret is not set."; exit 1; fi
+          # Trim CR/LF and surrounding whitespace that a paste can introduce.
+          DB_URL=$(printf '%s' "$RAW_DB_URL" | tr -d '\r\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+          HOST=$(printf '%s' "$DB_URL" | sed -E 's#.*@([^:/]+).*#\1#')
+          echo "::notice::host=$HOST db-tail=$(printf '%s' "$DB_URL" | sed -E 's#.*/##')"
           set +e
-          OUT=$(psql "$DB_URL" -c "select 1 as ok" 2>&1)
-          CODE=$?
+          OUT=$(psql "$DB_URL" -c "select 1" 2>&1); CODE=$?
           set -e
           if [ $CODE -ne 0 ]; then
-            MSG=$(echo "$OUT" | grep -iE 'psql:|error|fatal|could not|authentication|host|timeout' | head -2 | tr '\n' ' ')
-            echo "::error::Cannot connect (exit $CODE) to host=$HOST — $MSG"
+            echo "::error::connect failed (exit $CODE): $(printf '%s' "$OUT" | grep -iE 'fatal|error|could not|auth' | head -1)"
             exit 1
           fi
-          echo "::notice::Connection OK"
-      - name: Apply schema, RLS, reference data, seed
-        env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
+          echo "Connected. Applying schema + seed…"
           psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/reset_and_setup.sql
           psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
-          echo "::notice::$(psql "$DB_URL" -tA -c "select 'tables='||count(*)||' policies='||(select count(*) from pg_policies where schemaname='public')||' members='||(select count(*) from public.family_members) from information_schema.tables where table_schema='public' limit 1;")"
+          SUMMARY=$(psql "$DB_URL" -tA -c "select 'tables='||(select count(*) from information_schema.tables where table_schema='public')||' policies='||(select count(*) from pg_policies where schemaname='public')||' members='||(select count(*) from public.family_members)||' students='||(select count(*) from public.student_profiles);")
+          echo "::notice::DONE $SUMMARY"
