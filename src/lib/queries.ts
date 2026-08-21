@@ -140,12 +140,13 @@ export async function getTasks(familyId: string): Promise<Task[]> {
   if (!supabase) return [];
   const { data } = await supabase
     .from('tasks')
-    .select('id, title, description, priority, status, due_date, assignee_id, student_id, assignee:family_members!tasks_assignee_id_fkey(display_name), student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name))')
+    .select('id, title, description, priority, status, due_date, assignee_id, student_id, assignee:family_members!tasks_assignee_id_fkey(display_name), student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), recurrence:task_recurrences(frequency, active)')
     .eq('family_id', familyId)
     .order('due_date', { ascending: true });
 
   return (data ?? []).map((t) => {
     const studentName = one<{ member: { display_name: string } | null }>(t.student)?.member?.display_name;
+    const rec = ((t as { recurrence?: { frequency: string; active: boolean }[] }).recurrence ?? []).find((r) => r.active);
     return {
       id: t.id,
       title: t.title,
@@ -158,6 +159,7 @@ export async function getTasks(familyId: string): Promise<Task[]> {
       dueDate: t.due_date ?? null,
       studentId: (t as { student_id?: string | null }).student_id ?? null,
       assigneeId: (t as { assignee_id?: string | null }).assignee_id ?? null,
+      repeat: rec?.frequency ?? 'none',
     };
   });
 }

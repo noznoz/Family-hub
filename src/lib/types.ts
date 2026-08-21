@@ -47,6 +47,7 @@ export interface Task {
   dueDate?: string | null;
   studentId?: string | null;
   assigneeId?: string | null;
+  repeat?: string | null;
 }
 
 export interface Message {

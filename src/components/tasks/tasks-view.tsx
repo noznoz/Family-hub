@@ -12,6 +12,7 @@ import { ShareButton } from '@/components/ui/share-button';
 import { cn } from '@/lib/utils';
 import { setTaskStatus, deleteTask } from '@/lib/actions/tasks';
 import { TaskCreateDialog } from './task-create-dialog';
+import { TaskCommentsDialog } from './task-comments-dialog';
 import type { Task, TaskPriority, TaskStatus } from '@/lib/types';
 
 const FILTERS = ['My Tasks', 'Hamza', 'Omar', 'Family', 'Completed'] as const;
@@ -125,11 +126,13 @@ export function TasksView({
                   {t.student && <Chip tone="navy">{t.student}</Chip>}
                   {t.assignee && <Chip tone="neutral">{t.assignee}</Chip>}
                   {t.priority !== 'normal' && <Chip tone={priorityTone[t.priority]}>{t.priority}</Chip>}
+                  {t.repeat && t.repeat !== 'none' && <Chip tone="neutral">🔁 {t.repeat}</Chip>}
                   {t.status !== 'done' && <Chip tone="brand">{statusLabel[t.status]}</Chip>}
                   {t.due && <span className="text-xs font-semibold text-muted-foreground">{t.due}</span>}
                 </div>
               </div>
               <div className="flex shrink-0 items-center">
+                <TaskCommentsDialog taskId={t.id} title={t.title} live={live} />
                 <ShareButton
                   text={`📋 Task: ${t.title}${t.description ? `\n${t.description}` : ''}${t.due ? `\n🗓 Due: ${t.due}` : ''}${t.assignee ? `\n👤 ${t.assignee}` : ''}`}
                   url="/tasks"

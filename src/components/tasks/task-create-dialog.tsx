@@ -38,6 +38,7 @@ export function TaskCreateDialog({
     const dueDate = String(formData.get('dueDate') ?? '') || null;
     const studentId = String(formData.get('studentId') ?? '') || null;
     const assigneeId = String(formData.get('assigneeId') ?? '') || null;
+    const repeat = String(formData.get('repeat') ?? 'none');
     if (!title) {
       setError('Title is required.');
       return;
@@ -48,8 +49,8 @@ export function TaskCreateDialog({
 
     startTransition(async () => {
       const res = isEdit
-        ? await updateTask({ id: task!.id, title, description, priority, dueDate, studentId, assigneeId })
-        : await createTask({ title, description, priority, dueDate, studentId, assigneeId });
+        ? await updateTask({ id: task!.id, title, description, priority, dueDate, studentId, assigneeId, repeat })
+        : await createTask({ title, description, priority, dueDate, studentId, assigneeId, repeat });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -66,6 +67,7 @@ export function TaskCreateDialog({
         dueDate,
         studentId,
         assigneeId,
+        repeat,
       };
       if (isEdit) onSaved?.(next);
       else onCreated?.(next);
@@ -96,6 +98,15 @@ export function TaskCreateDialog({
               <Input id="dueDate" name="dueDate" type="date" defaultValue={task?.dueDate ?? undefined} />
             </Field>
           </div>
+          <Field label="Repeat" htmlFor="repeat">
+            <Select id="repeat" name="repeat" defaultValue={task?.repeat ?? 'none'}>
+              <option value="none">Does not repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </Select>
+          </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Related student" htmlFor="studentId">
               <Select id="studentId" name="studentId" defaultValue={task?.studentId ?? ''}>
