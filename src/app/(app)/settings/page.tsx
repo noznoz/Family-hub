@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { LogOut, ShieldCheck, Palette } from 'lucide-react';
+import { LogOut, ShieldCheck } from 'lucide-react';
 import { getSessionUser } from '@/lib/session';
 import { Card } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { PERMISSION_LABELS } from '@/lib/permissions';
 import { ROLE_DEFAULTS } from '@/lib/permissions';
 import { EnableNotifications } from '@/components/pwa/enable-notifications';
+import { ThemePicker } from '@/components/settings/theme-picker';
 import { signOut } from './actions';
 
 export const metadata: Metadata = { title: 'Settings' };
@@ -32,6 +33,16 @@ export default async function SettingsPage() {
 
       <div>
         <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+          Appearance
+        </p>
+        <p className="mb-3 px-1 text-xs text-muted-foreground">
+          Pick your look — it applies to your account only. Everyone in the family can choose their own.
+        </p>
+        <ThemePicker />
+      </div>
+
+      <div>
+        <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
           Push notifications
         </p>
         <Card className="p-4">
@@ -41,7 +52,6 @@ export default async function SettingsPage() {
 
       <Card className="divide-y divide-border">
         <RowLink icon={<ShieldCheck className="size-5" />} label="Privacy & security" />
-        <RowLink icon={<Palette className="size-5" />} label="Appearance" />
       </Card>
 
       <div>

@@ -2,8 +2,179 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* ---------------------------------------------------------------------------
+   Themes. Each member picks one in Settings; it's stored in a cookie and set
+   as data-theme on <html> (see src/app/layout.tsx and the theme picker).
+   Colors are "R G B" triplets so Tailwind's /opacity modifiers keep working.
+   --------------------------------------------------------------------------- */
+
+/* 01 · Deep Navy (default) — trusted, calm, quietly premium */
+:root,
+:root[data-theme='navy'] {
   color-scheme: light;
+  --font-sans: var(--font-jakarta);
+  --radius-card: 1.5rem;
+
+  --c-navy: 15 42 74;
+  --c-navy-50: 234 240 247;
+  --c-navy-100: 214 225 239;
+  --c-navy-200: 174 195 223;
+  --c-navy-300: 133 165 207;
+  --c-navy-400: 78 119 174;
+  --c-navy-500: 42 82 127;
+  --c-navy-600: 27 62 99;
+  --c-navy-700: 15 42 74;
+  --c-navy-800: 10 30 54;
+  --c-navy-900: 6 19 35;
+
+  --c-brand: 47 111 237;
+  --c-brand-soft: 91 141 242;
+  --c-brand-muted: 231 238 253;
+
+  --c-success: 31 169 113;
+  --c-success-soft: 229 246 239;
+  --c-attention: 232 136 12;
+  --c-attention-soft: 253 240 222;
+  --c-danger: 220 38 38;
+  --c-danger-soft: 252 232 232;
+
+  --c-border: 224 229 235;
+  --c-input: 224 229 235;
+  --c-ring: 47 111 237;
+  --c-background: 246 248 251;
+  --c-foreground: 10 30 54;
+  --c-card: 255 255 255;
+  --c-card-foreground: 10 30 54;
+  --c-muted: 238 242 247;
+  --c-muted-foreground: 90 107 128;
+  --c-accent: 231 238 253;
+  --c-accent-foreground: 15 42 74;
+}
+
+/* 02 · Warm Hearth — homey, human, kitchen-table warmth */
+:root[data-theme='hearth'] {
+  color-scheme: light;
+  --font-sans: var(--font-nunito);
+  --radius-card: 1.5rem;
+
+  --c-navy: 55 48 42;
+  --c-navy-50: 243 236 225;
+  --c-navy-100: 233 222 206;
+  --c-navy-200: 217 199 175;
+  --c-navy-300: 195 168 134;
+  --c-navy-400: 156 132 104;
+  --c-navy-500: 122 106 87;
+  --c-navy-600: 90 78 65;
+  --c-navy-700: 55 48 42;
+  --c-navy-800: 42 36 32;
+  --c-navy-900: 28 24 21;
+
+  --c-brand: 180 85 45;
+  --c-brand-soft: 201 118 79;
+  --c-brand-muted: 240 220 203;
+
+  --c-success: 76 107 74;
+  --c-success-soft: 227 236 223;
+  --c-attention: 154 106 22;
+  --c-attention-soft: 245 230 201;
+  --c-danger: 178 58 46;
+  --c-danger-soft: 246 225 220;
+
+  --c-border: 231 219 201;
+  --c-input: 231 219 201;
+  --c-ring: 180 85 45;
+  --c-background: 247 241 231;
+  --c-foreground: 55 48 42;
+  --c-card: 255 253 248;
+  --c-card-foreground: 55 48 42;
+  --c-muted: 239 230 215;
+  --c-muted-foreground: 138 125 109;
+  --c-accent: 240 220 203;
+  --c-accent-foreground: 55 48 42;
+}
+
+/* 03 · Fresh Campus — energetic, optimistic, student-first */
+:root[data-theme='campus'] {
+  color-scheme: light;
+  --font-sans: var(--font-dm);
+  --radius-card: 1.5rem;
+
+  --c-navy: 12 46 42;
+  --c-navy-50: 230 244 240;
+  --c-navy-100: 205 232 225;
+  --c-navy-200: 165 211 200;
+  --c-navy-300: 111 182 168;
+  --c-navy-400: 62 142 126;
+  --c-navy-500: 42 107 94;
+  --c-navy-600: 27 78 68;
+  --c-navy-700: 12 46 42;
+  --c-navy-800: 8 33 30;
+  --c-navy-900: 5 21 18;
+
+  --c-brand: 14 158 142;
+  --c-brand-soft: 63 183 168;
+  --c-brand-muted: 212 242 236;
+
+  --c-success: 47 143 62;
+  --c-success-soft: 223 243 226;
+  --c-attention: 229 96 47;
+  --c-attention-soft: 253 227 218;
+  --c-danger: 226 59 59;
+  --c-danger-soft: 252 227 227;
+
+  --c-border: 214 235 230;
+  --c-input: 214 235 230;
+  --c-ring: 14 158 142;
+  --c-background: 244 251 248;
+  --c-foreground: 12 46 42;
+  --c-card: 255 255 255;
+  --c-card-foreground: 12 46 42;
+  --c-muted: 228 241 236;
+  --c-muted-foreground: 93 122 117;
+  --c-accent: 212 242 236;
+  --c-accent-foreground: 12 46 42;
+}
+
+/* 04 · Editorial Ink — refined, minimal, literary */
+:root[data-theme='ink'] {
+  color-scheme: light;
+  --font-sans: var(--font-newsreader);
+  --radius-card: 0.5rem;
+
+  --c-navy: 28 27 26;
+  --c-navy-50: 242 240 236;
+  --c-navy-100: 231 228 222;
+  --c-navy-200: 211 207 199;
+  --c-navy-300: 179 174 164;
+  --c-navy-400: 139 133 124;
+  --c-navy-500: 107 101 92;
+  --c-navy-600: 71 67 61;
+  --c-navy-700: 28 27 26;
+  --c-navy-800: 20 19 17;
+  --c-navy-900: 12 11 10;
+
+  --c-brand: 110 51 85;
+  --c-brand-soft: 138 78 113;
+  --c-brand-muted: 239 225 234;
+
+  --c-success: 63 107 78;
+  --c-success-soft: 230 238 232;
+  --c-attention: 138 100 20;
+  --c-attention-soft: 243 233 209;
+  --c-danger: 158 43 43;
+  --c-danger-soft: 241 224 224;
+
+  --c-border: 232 228 220;
+  --c-input: 232 228 220;
+  --c-ring: 110 51 85;
+  --c-background: 250 249 246;
+  --c-foreground: 28 27 26;
+  --c-card: 255 255 255;
+  --c-card-foreground: 28 27 26;
+  --c-muted: 240 237 230;
+  --c-muted-foreground: 139 133 124;
+  --c-accent: 239 225 234;
+  --c-accent-foreground: 28 27 26;
 }
 
 html {
