@@ -1,0 +1,32 @@
+name: DB push setup
+on:
+  push:
+    branches: ['claude/family-hub-pwa-build-j1eivv']
+    paths: ['.github/db-push.trigger']
+  workflow_dispatch:
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Apply push migration
+        env:
+          RAW_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          DB_URL=$(printf '%s' "$RAW_DB_URL" | tr -d '\r\n' | sed -E 's/[[:space:]]+$//')
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrate_push.sql
+      - name: Generate & store VAPID keys (once)
+        env:
+          RAW_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          DB_URL=$(printf '%s' "$RAW_DB_URL" | tr -d '\r\n' | sed -E 's/[[:space:]]+$//')
+          npm i -g web-push >/dev/null 2>&1
+          KEYS=$(web-push generate-vapid-keys --json)
+          PUB=$(printf '%s' "$KEYS" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).publicKey))")
+          PRIV=$(printf '%s' "$KEYS" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).privateKey))")
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -c "insert into public.app_config(key,value) values ('vapid_public','$PUB') on conflict (key) do nothing;"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -c "insert into public.app_config(key,value) values ('vapid_private','$PRIV') on conflict (key) do nothing;"
+          STORED=$(psql "$DB_URL" -tA -c "select left(value,14) from public.app_config where key='vapid_public';")
+          echo "::notice::VAPID ready. public=$STORED..."
