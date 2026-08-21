@@ -2,10 +2,17 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Coordinates, CalculationMethod, PrayerTimes, Madhab, SunnahTimes } from 'adhan';
-import { Sunrise, Sun, Sunset, MoonStar, Moon, MapPin, Clock, type LucideIcon } from 'lucide-react';
+import { Sunrise, Sun, Sunset, MoonStar, Moon, MapPin, Clock, BellPlus, Loader2, type LucideIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
+import { Button } from '@/components/ui/button';
+import { createReminder } from '@/lib/actions/reminders';
 import { cn } from '@/lib/utils';
+
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 // University of Surrey, Guildford, England.
 const SURREY = new Coordinates(51.2431, -0.5891);
@@ -51,9 +58,12 @@ function loadPrefs(): { method: MethodId; madhab: MadhabId } {
   return { method: 'MuslimWorldLeague', madhab: 'shafi' };
 }
 
-export function PrayerTimesView() {
+export function PrayerTimesView({ live = true }: { live?: boolean }) {
   const [{ method, madhab }, setPrefs] = useState(loadPrefs);
   const [now, setNow] = useState(() => Date.now());
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduled, setScheduled] = useState(false);
+  const [offset, setOffset] = useState(0);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -95,6 +105,26 @@ export function PrayerTimesView() {
   const nextLabel = ROWS.find((r) => r.key === nextKey)?.label ?? '';
 
   const todayLabel = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ }).format(new Date());
+
+  const scheduleToday = async () => {
+    if (!live) return;
+    setScheduling(true);
+    try {
+      const upcoming = rows.filter((r) => !r.info && r.at.getTime() - offset * 60_000 > Date.now());
+      for (const r of upcoming) {
+        const at = new Date(r.at.getTime() - offset * 60_000);
+        await createReminder({
+          entityType: 'prayer', title: `🕌 ${r.label}${offset ? ` in ${offset} min` : ''}`,
+          body: `${r.label} at ${fmt(r.at)} — University of Surrey`,
+          link: '/prayer', remindAt: toLocalInput(at), channelEmail: false,
+        });
+      }
+      setScheduled(true);
+      setTimeout(() => setScheduled(false), 2500);
+    } finally {
+      setScheduling(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -147,6 +177,25 @@ export function PrayerTimesView() {
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-navy"><Moon className="size-5" /></span>
         <span className="flex-1 font-semibold text-navy">Last third of the night <span className="text-xs font-normal text-muted-foreground">(Qiyam)</span></span>
         <span className="font-mono font-bold tabular-nums text-navy">{fmt(qiyam)}</span>
+      </Card>
+
+      {/* Reminders */}
+      <Card className="p-4">
+        <p className="flex items-center gap-1.5 font-semibold text-navy"><BellPlus className="size-4 text-brand" /> Prayer reminders</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">Get a phone notification for each of today’s remaining prayers.</p>
+        <div className="mt-3 flex items-center gap-2">
+          <select value={offset} onChange={(e) => setOffset(Number(e.target.value))}
+            className="h-11 flex-1 rounded-xl border border-input bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <option value={0}>At prayer time</option>
+            <option value={5}>5 min before</option>
+            <option value={10}>10 min before</option>
+            <option value={15}>15 min before</option>
+          </select>
+          <Button variant="brand" onClick={scheduleToday} disabled={scheduling || scheduled || !live} className="shrink-0">
+            {scheduled ? 'Set ✓' : scheduling ? <Loader2 className="size-4 animate-spin" /> : 'Remind me today'}
+          </Button>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">Tip: set this each morning. You can cancel any reminder from Notifications.</p>
       </Card>
 
       {/* Calculation settings */}
