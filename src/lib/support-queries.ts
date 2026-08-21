@@ -52,6 +52,7 @@ export interface RecipeDetail extends RecipeCard {
   ingredients: string[];
   steps: { no: number; body: string; image: string | null }[];
   audio: { id: string; url: string | null; duration: number | null }[];
+  photos: { id: string; url: string | null; caption: string | null }[];
 }
 
 export async function getRecipe(id: string): Promise<RecipeDetail | null> {
@@ -59,7 +60,7 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
   if (!supabase) return null;
   const { data: r } = await supabase
     .from('recipes')
-    .select('id, name, category, description, prep_minutes, cook_minutes, difficulty, servings, cover_path, ingredients:recipe_ingredients(text, sort_order), steps:recipe_steps(step_no, body, image_path), audio:support_audio(id, storage_path, duration_sec)')
+    .select('id, name, category, description, prep_minutes, cook_minutes, difficulty, servings, cover_path, ingredients:recipe_ingredients(text, sort_order), steps:recipe_steps(step_no, body, image_path), audio:support_audio(id, storage_path, duration_sec), media:recipe_media(id, storage_path, caption, sort_order)')
     .eq('id', id)
     .maybeSingle();
   if (!r) return null;
@@ -72,6 +73,11 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
   const audio = await Promise.all(
     (((r.audio as { id: string; storage_path: string; duration_sec: number | null }[]) ?? []))
       .map(async (a) => ({ id: a.id, url: await signed(a.storage_path), duration: a.duration_sec })),
+  );
+  const photos = await Promise.all(
+    (((r.media as { id: string; storage_path: string; caption: string | null; sort_order: number }[]) ?? [])
+      .sort((a, b) => a.sort_order - b.sort_order))
+      .map(async (m) => ({ id: m.id, url: await signed(m.storage_path), caption: m.caption })),
   );
 
   return {
@@ -88,6 +94,7 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
       .sort((a, b) => a.sort_order - b.sort_order).map((i) => i.text)),
     steps,
     audio,
+    photos,
   };
 }
 

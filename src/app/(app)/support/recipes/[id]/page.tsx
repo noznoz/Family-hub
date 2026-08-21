@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { VoiceRecorder } from '@/components/support/voice-recorder';
 import { RecipeHeaderActions } from '@/components/support/recipe-header-actions';
+import { RecipeCoverButton, RecipePhotos } from '@/components/support/recipe-photos';
 
 export const metadata: Metadata = { title: 'Recipe' };
 
@@ -25,12 +26,19 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
       <Link href="/support/recipes" className="inline-flex items-center gap-1 text-sm font-semibold text-brand"><ChevronLeft className="size-4" /> Recipes</Link>
 
       <Card className="overflow-hidden">
-        {recipe.cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={recipe.cover} alt={recipe.name} className="h-48 w-full object-cover" />
-        ) : (
-          <div className="flex h-40 w-full items-center justify-center bg-muted"><ChefHat className="size-10 text-navy-200" /></div>
-        )}
+        <div className="relative">
+          {recipe.cover ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={recipe.cover} alt={recipe.name} className="h-48 w-full object-cover" />
+          ) : (
+            <div className="flex h-40 w-full items-center justify-center bg-muted"><ChefHat className="size-10 text-navy-200" /></div>
+          )}
+          {canEdit && (
+            <div className="absolute bottom-2 right-2">
+              <RecipeCoverButton recipeId={recipe.id} familyId={session.familyId} hasCover={!!recipe.cover} live={!session.isDemo} />
+            </div>
+          )}
+        </div>
         <div className="p-5">
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-2xl font-extrabold tracking-tight text-navy">{recipe.name}</h1>
@@ -59,6 +67,14 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
         )}
         {canEdit && <VoiceRecorder recipeId={recipe.id} familyId={session.familyId} />}
       </section>
+
+      <RecipePhotos
+        recipeId={recipe.id}
+        familyId={session.familyId}
+        photos={recipe.photos}
+        canEdit={canEdit}
+        live={!session.isDemo}
+      />
 
       {recipe.ingredients.length > 0 && (
         <section>

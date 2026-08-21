@@ -145,6 +145,34 @@ export async function setRecipeCover(recipeId: string, storagePath: string): Pro
   return { ok: true };
 }
 
+/** Record a recipe photo after the image has been uploaded to storage. */
+export async function addRecipePhoto(recipeId: string, storagePath: string, caption?: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard();
+  if (!g.ok) return g;
+  const { count } = await g.supabase
+    .from('recipe_media').select('id', { count: 'exact', head: true }).eq('recipe_id', recipeId);
+  const { error } = await g.supabase.from('recipe_media').insert({
+    recipe_id: recipeId,
+    storage_path: storagePath,
+    caption: caption || null,
+    sort_order: count ?? 0,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/support/recipes/${recipeId}`);
+  return { ok: true };
+}
+
+export async function deleteRecipePhoto(mediaId: string, recipeId: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard();
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('recipe_media').delete().eq('id', mediaId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/support/recipes/${recipeId}`);
+  return { ok: true };
+}
+
 export async function deleteVoiceNote(audioId: string, recipeId: string): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };
   const g = await guard();
