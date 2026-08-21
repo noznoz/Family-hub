@@ -6,6 +6,7 @@ import { getSessionUser } from '@/lib/session';
 import { isSupabaseConfigured } from '@/lib/env';
 import { can } from '@/lib/permissions';
 import type { ExpenseCategory, TaskPriority } from '@/lib/types';
+import { sendPushToMember } from '@/lib/push';
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -86,6 +87,18 @@ export async function createPaymentRequest(input: RequestInput): Promise<Result>
     status: 'requested',
   });
   if (error) return { ok: false, error: error.message };
+
+  // Notify approvers (admins/parents) of the new request.
+  try {
+    const { data: approvers } = await c.supabase
+      .from('family_members').select('id')
+      .eq('family_id', c.session.familyId).eq('status', 'active').in('role', ['admin', 'parent']);
+    const who = c.session.member.displayName;
+    await Promise.all((approvers ?? [])
+      .filter((a) => a.id !== c.session.memberId)
+      .map((a) => sendPushToMember(a.id, { title: 'New payment request', body: `${who} requested ${input.currency || 'GBP'} ${input.amount} — ${input.reason.trim()}`, url: '/money' })));
+  } catch {}
+
   revalidatePath('/money');
   revalidatePath('/home');
   return { ok: true };
@@ -97,12 +110,16 @@ export async function decidePaymentRequest(id: string, decision: 'approved' | 'r
   if (!c) return { ok: false, error: 'Not signed in.' };
   if (!can(c.session.member.role, 'approve_payment_requests')) return { ok: false, error: 'No permission to approve.' };
 
+  const { data: reqRow } = await c.supabase.from('payment_requests').select('requested_by, amount, currency, reason').eq('id', id).maybeSingle();
   const { error } = await c.supabase
     .from('payment_requests')
     .update({ status: decision, decided_by: c.userId, decided_at: new Date().toISOString() })
     .eq('id', id);
   if (error) return { ok: false, error: error.message };
   await audit(c.session.familyId, c.userId, `payment.${decision}`, 'payment_request', id, {});
+  if (reqRow?.requested_by) {
+    try { await sendPushToMember(reqRow.requested_by, { title: `Payment ${decision}`, body: `Your request for ${reqRow.currency} ${reqRow.amount} was ${decision}.`, url: '/money' }); } catch {}
+  }
   revalidatePath('/money');
   return { ok: true };
 }

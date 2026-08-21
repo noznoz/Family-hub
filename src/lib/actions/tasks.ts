@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getSessionUser } from '@/lib/session';
 import { isSupabaseConfigured } from '@/lib/env';
 import type { TaskPriority, TaskStatus } from '@/lib/types';
+import { sendPushToMember } from '@/lib/push';
 
 export interface CreateTaskInput {
   title: string;
@@ -42,6 +43,10 @@ export async function createTask(input: CreateTaskInput): Promise<Result> {
     created_by: user?.id ?? null,
   });
   if (error) return { ok: false, error: error.message };
+
+  if (input.assigneeId) {
+    try { await sendPushToMember(input.assigneeId, { title: 'New task', body: input.title.trim(), url: '/tasks' }); } catch {}
+  }
 
   revalidatePath('/tasks');
   revalidatePath('/home');
