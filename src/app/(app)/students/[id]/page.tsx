@@ -15,6 +15,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { ShareButton } from '@/components/ui/share-button';
 import { SecretValue } from '@/components/students/secret-value';
 import { StudentPrivateDialog } from '@/components/students/student-private-dialog';
+import { MilestonesManager } from '@/components/students/milestones-manager';
 
 export const metadata: Metadata = { title: 'Student' };
 
@@ -230,17 +231,13 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
       )}
 
       {/* ── Milestones ───────────────────────────────────────── */}
-      {detail && detail.milestones.length > 0 && (
-        <Section title="Milestones">
-          <Card className="divide-y divide-border">
-            {detail.milestones.map((m) => (
-              <div key={m.id} className="flex items-center justify-between p-4">
-                <p className="font-medium text-navy">{m.title}</p>
-                {m.occurred_on && <span className="text-xs text-muted-foreground">{m.occurred_on}</span>}
-              </div>
-            ))}
-          </Card>
-        </Section>
+      {detail && (
+        <MilestonesManager
+          studentId={id}
+          milestones={detail.milestones}
+          live={!session.isDemo}
+          canManage={session.member.role === 'admin' || session.member.role === 'parent'}
+        />
       )}
 
       {canPrivate && priv?.notes && (

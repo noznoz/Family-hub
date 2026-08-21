@@ -13,7 +13,7 @@ function fmtDate(d: string | null | undefined): string | null {
 }
 
 export interface FundingPeriod { id: string; label: string; status: string; start_date: string; end_date: string | null }
-export interface Milestone { id: string; title: string; occurred_on: string | null }
+export interface Milestone { id: string; title: string; occurred_on: string | null; occurredDate: string | null; description: string; kind: string }
 
 export interface StudentDetail {
   memberId: string;
@@ -68,7 +68,7 @@ export async function getStudentDetail(studentId: string): Promise<StudentDetail
   const today = new Date().toISOString().slice(0, 10);
   const [fundRes, mileRes, accRes, taskRes, expRes, reqRes, docRes, tripRes] = await Promise.all([
     supabase.from('funding_sources').select('id, label, status, start_date, end_date').eq('student_id', studentId).order('start_date', { ascending: true }),
-    supabase.from('student_milestones').select('id, title, occurred_on').eq('student_id', studentId).order('occurred_on', { ascending: true }),
+    supabase.from('student_milestones').select('id, title, occurred_on, description, kind').eq('student_id', studentId).order('occurred_on', { ascending: true }),
     supabase.from('accommodations').select('property, address, monthly_rent, currency, end_date, start_date').eq('student_id', studentId).order('start_date', { ascending: false }),
     supabase.from('tasks').select('id, title, status, priority, due_date').or(`student_id.eq.${studentId},assignee_id.eq.${memberId}`).neq('status', 'done').order('due_date', { ascending: true }).limit(20),
     supabase.from('expenses').select('amount, currency').eq('student_id', studentId).limit(500),
@@ -107,7 +107,10 @@ export async function getStudentDetail(studentId: string): Promise<StudentDetail
       .sort((a, b) => (a.study_year ?? 0) - (b.study_year ?? 0))
       .map((y) => ({ label: y.label, studyYear: y.study_year, status: y.status }))),
     funding: (fundRes.data ?? []).map((f) => ({ ...f, start_date: fmtDate(f.start_date) ?? f.start_date, end_date: f.end_date ? fmtDate(f.end_date) : null })) as FundingPeriod[],
-    milestones: ((mileRes.data ?? []).map((m) => ({ ...m, occurred_on: fmtDate(m.occurred_on) }))) as Milestone[],
+    milestones: ((mileRes.data ?? []).map((m) => ({
+      id: m.id, title: m.title, occurred_on: fmtDate(m.occurred_on), occurredDate: m.occurred_on ?? null,
+      description: (m as { description?: string | null }).description ?? '', kind: (m as { kind?: string }).kind ?? 'other',
+    }))) as Milestone[],
     accommodation: acc ? { property: acc.property, address: acc.address ?? '', rent: acc.monthly_rent ? `${acc.currency ?? 'GBP'} ${acc.monthly_rent}/mo` : '—' } : null,
     tasks: (taskRes.data ?? []).map((t) => ({ id: t.id, title: t.title, status: t.status, priority: t.priority, due: t.due_date ? dueLabel(t.due_date) : null })),
     spentTotal,

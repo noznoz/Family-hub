@@ -519,3 +519,83 @@ export async function deleteFunding(id: string): Promise<Result> {
   revalidatePath('/scholarship');
   return { ok: true };
 }
+
+// ── Student milestones ────────────────────────────────────────────────────────
+export interface MilestoneInput {
+  studentId: string;
+  kind?: string;
+  title: string;
+  description?: string;
+  occurredOn?: string | null;
+}
+
+export async function addMilestone(input: MilestoneInput): Promise<Result> {
+  if (!input.title.trim()) return { ok: false, error: 'Title is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('admin_parent');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('student_milestones').insert({
+    student_id: input.studentId, kind: input.kind || 'other', title: input.title.trim(),
+    description: input.description || null, occurred_on: input.occurredOn || null,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/students/${input.studentId}`);
+  return { ok: true };
+}
+
+export async function updateMilestone(input: MilestoneInput & { id: string }): Promise<Result> {
+  if (!input.title.trim()) return { ok: false, error: 'Title is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('admin_parent');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('student_milestones').update({
+    kind: input.kind || 'other', title: input.title.trim(),
+    description: input.description || null, occurred_on: input.occurredOn || null,
+  }).eq('id', input.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/students/${input.studentId}`);
+  return { ok: true };
+}
+
+export async function deleteMilestone(id: string, studentId: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('admin_parent');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('student_milestones').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/students/${studentId}`);
+  return { ok: true };
+}
+
+// ── Academic terms (within a year) ────────────────────────────────────────────
+export interface TermInput {
+  academicYearId: string;
+  name: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  notes?: string;
+}
+
+export async function addAcademicTerm(input: TermInput): Promise<Result> {
+  if (!input.name.trim()) return { ok: false, error: 'Term name is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('admin_parent');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('academic_terms').insert({
+    academic_year_id: input.academicYearId, name: input.name.trim(),
+    start_date: input.startDate || null, end_date: input.endDate || null, notes: input.notes || null,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/university');
+  return { ok: true };
+}
+
+export async function deleteAcademicTerm(id: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('admin_parent');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('academic_terms').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/university');
+  return { ok: true };
+}
