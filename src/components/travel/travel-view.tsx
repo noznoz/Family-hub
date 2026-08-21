@@ -1,6 +1,6 @@
 'use client';
 
-import { Plane, Users, Plus, Pencil } from 'lucide-react';
+import { Plane, Users, Plus, Pencil, Ticket } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { DeleteButton } from '@/components/ui/delete-button';
 import { ReminderButton } from '@/components/ui/reminder-button';
 import { ShareButton } from '@/components/ui/share-button';
 import { TripFormDialog } from './trip-form-dialog';
+import { FlightsDialog } from './flights-dialog';
 import { deleteTrip } from '@/lib/actions/journey';
 import { useRouter } from 'next/navigation';
 import type { TripView } from '@/lib/journey-queries';
@@ -42,6 +43,12 @@ export function TravelView({
                   <Users className="size-3.5" /> {t.travelers.join(', ')}
                 </p>
               )}
+              <FlightsDialog trip={t} live={live} canManage={canManage}
+                trigger={
+                  <button type="button" className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-brand">
+                    <Ticket className="size-3.5" /> {t.flights.length > 0 ? `${t.flights.length} flight${t.flights.length === 1 ? '' : 's'}` : 'Add flights'}
+                  </button>
+                } />
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <Chip tone={tone}>{t.departLabel}</Chip>

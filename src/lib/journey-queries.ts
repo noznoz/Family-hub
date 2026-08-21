@@ -1,6 +1,15 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
+import { env } from '@/lib/env';
 import { dueLabel } from '@/lib/utils';
+
+async function signMedia(path: string | null | undefined): Promise<string | null> {
+  if (!path) return null;
+  const supabase = await createClient();
+  if (!supabase) return null;
+  const { data } = await supabase.storage.from(env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET).createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
+}
 
 function one<T>(rel: unknown): T | null {
   if (!rel) return null;
@@ -13,17 +22,22 @@ function fmtDate(d: string | null): string {
 }
 
 // ── Travel ────────────────────────────────────────────────────────────────
+export interface FlightView {
+  id: string; airline: string; flightNumber: string; bookingRef: string;
+  departAirport: string; arriveAirport: string; departAt: string; arriveAt: string;
+  terminal: string; seat: string; baggage: string;
+}
 export interface TripView {
   id: string; title: string; origin: string; destination: string;
   departLabel: string; departRaw: string | null; travelers: string[]; upcoming: boolean;
-  destAddress: string; notes: string; memberIds: string[];
+  destAddress: string; notes: string; memberIds: string[]; flights: FlightView[];
 }
 export async function getTrips(familyId: string): Promise<TripView[]> {
   const supabase = await createClient();
   if (!supabase) return [];
   const { data } = await supabase
     .from('trips')
-    .select('id, title, origin, destination, depart_at, dest_address, notes, members:trip_members(member:family_members!trip_members_member_id_fkey(id, display_name))')
+    .select('id, title, origin, destination, depart_at, dest_address, notes, members:trip_members(member:family_members!trip_members_member_id_fkey(id, display_name)), flights:flights(id, airline, flight_number, booking_ref, depart_airport, arrive_airport, depart_at, arrive_at, terminal, seat, baggage)')
     .eq('family_id', familyId)
     .order('depart_at', { ascending: true });
   const now = Date.now();
@@ -43,8 +57,25 @@ export async function getTrips(familyId: string): Promise<TripView[]> {
       destAddress: (t as { dest_address?: string | null }).dest_address ?? '',
       notes: (t as { notes?: string | null }).notes ?? '',
       upcoming: t.depart_at ? new Date(t.depart_at).getTime() > now : false,
+      flights: (((t as { flights?: Record<string, unknown>[] }).flights) ?? []).map((f) => ({
+        id: String(f.id),
+        airline: (f.airline as string) ?? '',
+        flightNumber: (f.flight_number as string) ?? '',
+        bookingRef: (f.booking_ref as string) ?? '',
+        departAirport: (f.depart_airport as string) ?? '',
+        arriveAirport: (f.arrive_airport as string) ?? '',
+        departAt: f.depart_at ? fmtDateTime(f.depart_at as string) : '',
+        arriveAt: f.arrive_at ? fmtDateTime(f.arrive_at as string) : '',
+        terminal: (f.terminal as string) ?? '',
+        seat: (f.seat as string) ?? '',
+        baggage: (f.baggage as string) ?? '',
+      })),
     };
   });
+}
+
+function fmtDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 // ── Accommodation ───────────────────────────────────────────────────────────
@@ -53,17 +84,19 @@ export interface AccommodationView {
   start: string; end: string; rent: string; student: string; current: boolean;
   studentId: string | null; contact: string; startDate: string | null; endDate: string | null;
   rentAmount: number | null; deposit: number | null; currency: string;
+  wifiInfo: string; utilityNotes: string; maintenanceNotes: string;
+  contractUrl: string | null; photos: { id: string; url: string | null }[];
 }
 export async function getAccommodations(familyId: string): Promise<AccommodationView[]> {
   const supabase = await createClient();
   if (!supabase) return [];
   const { data } = await supabase
     .from('accommodations')
-    .select('id, property, address, landlord, contact, start_date, end_date, monthly_rent, deposit, currency, student_id, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name))')
+    .select('id, property, address, landlord, contact, start_date, end_date, monthly_rent, deposit, currency, student_id, wifi_info, utility_notes, maintenance_notes, contract_path, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), photos:accommodation_photos(id, storage_path)')
     .eq('family_id', familyId)
     .order('start_date', { ascending: false });
   const today = new Date().toISOString().slice(0, 10);
-  return (data ?? []).map((a) => ({
+  return Promise.all((data ?? []).map(async (a) => ({
     id: a.id,
     property: a.property,
     address: a.address ?? '',
@@ -80,7 +113,12 @@ export async function getAccommodations(familyId: string): Promise<Accommodation
     rentAmount: a.monthly_rent != null ? Number(a.monthly_rent) : null,
     deposit: (a as { deposit?: number | null }).deposit != null ? Number((a as { deposit?: number | null }).deposit) : null,
     currency: a.currency ?? 'GBP',
-  }));
+    wifiInfo: (a as { wifi_info?: string | null }).wifi_info ?? '',
+    utilityNotes: (a as { utility_notes?: string | null }).utility_notes ?? '',
+    maintenanceNotes: (a as { maintenance_notes?: string | null }).maintenance_notes ?? '',
+    contractUrl: await signMedia((a as { contract_path?: string | null }).contract_path),
+    photos: await Promise.all((((a as { photos?: { id: string; storage_path: string }[] }).photos) ?? []).map(async (p) => ({ id: p.id, url: await signMedia(p.storage_path) }))),
+  })));
 }
 
 // ── University ────────────────────────────────────────────────────────────

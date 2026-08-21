@@ -1,27 +1,32 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Paperclip } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Field, Select } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { uploadMedia } from '@/lib/storage';
 import { createAccommodation, updateAccommodation } from '@/lib/actions/journey';
 import type { AccommodationView } from '@/lib/journey-queries';
 
 export function AccommodationFormDialog({
-  trigger, live, students, item,
+  trigger, live, students, item, familyId,
 }: {
   trigger: React.ReactNode;
   live: boolean;
   students: { id: string; name: string }[];
   item?: AccommodationView;
+  familyId?: string;
 }) {
   const router = useRouter();
   const isEdit = !!item;
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [contract, setContract] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const onSubmit = (formData: FormData) => {
     const property = String(formData.get('property') ?? '').trim();
@@ -39,12 +44,23 @@ export function AccommodationFormDialog({
       monthlyRent: num('monthlyRent'),
       deposit: num('deposit'),
       currency: String(formData.get('currency') ?? 'GBP'),
+      wifiInfo: String(formData.get('wifiInfo') ?? ''),
+      utilityNotes: String(formData.get('utilityNotes') ?? ''),
+      maintenanceNotes: String(formData.get('maintenanceNotes') ?? ''),
     };
     startTransition(async () => {
+      let contractPath: string | null | undefined;
+      if (contract && live && familyId) {
+        const safe = contract.name.replace(/[^\w.\-]+/g, '_');
+        contractPath = await uploadMedia(familyId, contract, `accommodation/${Date.now()}-${safe}`);
+        if (!contractPath) return setError('Contract upload failed. Try again.');
+      }
+      const full = { ...payload, ...(contractPath ? { contractPath } : {}) };
       const res = live
-        ? (isEdit ? await updateAccommodation({ id: item!.id, ...payload }) : await createAccommodation(payload))
+        ? (isEdit ? await updateAccommodation({ id: item!.id, ...full }) : await createAccommodation(full))
         : { ok: true as const };
       if (!res.ok) return setError(res.error);
+      setContract(null);
       setOpen(false);
       router.refresh();
     });
@@ -81,6 +97,16 @@ export function AccommodationFormDialog({
           <div className="grid grid-cols-2 gap-3">
             <Field label="Landlord" htmlFor="landlord"><Input id="landlord" name="landlord" defaultValue={item?.landlord} placeholder="Optional" /></Field>
             <Field label="Contact" htmlFor="contact"><Input id="contact" name="contact" defaultValue={item?.contact} placeholder="Phone / email" /></Field>
+          </div>
+          <Field label="Wi-Fi" htmlFor="wifiInfo"><Input id="wifiInfo" name="wifiInfo" defaultValue={item?.wifiInfo} placeholder="Network & password" /></Field>
+          <Field label="Utilities notes" htmlFor="utilityNotes"><Input id="utilityNotes" name="utilityNotes" defaultValue={item?.utilityNotes} placeholder="Gas/electric/water accounts, meter, bins day…" /></Field>
+          <Field label="Maintenance notes" htmlFor="maintenanceNotes"><Input id="maintenanceNotes" name="maintenanceNotes" defaultValue={item?.maintenanceNotes} placeholder="Who to call, boiler, issues…" /></Field>
+          <div>
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden onChange={(e) => setContract(e.target.files?.[0] ?? null)} />
+            <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-3 py-2.5 text-sm font-semibold text-navy hover:bg-muted">
+              <Paperclip className="size-4 text-navy-400" />
+              {contract ? contract.name : item?.contractUrl ? 'Replace contract' : 'Attach tenancy contract (optional)'}
+            </button>
           </div>
           {!live && <p className="rounded-lg bg-brand-muted px-3 py-2 text-xs text-navy">Demo mode — not saved.</p>}
           {error && <p className="text-sm font-medium text-danger">{error}</p>}

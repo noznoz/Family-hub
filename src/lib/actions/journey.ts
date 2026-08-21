@@ -107,15 +107,14 @@ export interface AccommodationInput {
   monthlyRent?: number | null;
   deposit?: number | null;
   currency?: string;
+  wifiInfo?: string;
+  utilityNotes?: string;
+  maintenanceNotes?: string;
+  contractPath?: string | null;
 }
 
-export async function createAccommodation(input: AccommodationInput): Promise<Result> {
-  if (!input.property.trim()) return { ok: false, error: 'Property name is required.' };
-  if (!isSupabaseConfigured) return { ok: true };
-  const g = await guard('manage_travel');
-  if (!g.ok) return g;
-  const { error } = await g.supabase.from('accommodations').insert({
-    family_id: g.session.familyId,
+function accomFields(input: AccommodationInput) {
+  return {
     student_id: input.studentId || null,
     property: input.property.trim(),
     address: input.address || null,
@@ -126,7 +125,19 @@ export async function createAccommodation(input: AccommodationInput): Promise<Re
     monthly_rent: input.monthlyRent ?? null,
     deposit: input.deposit ?? null,
     currency: input.currency || 'GBP',
-  });
+    wifi_info: input.wifiInfo || null,
+    utility_notes: input.utilityNotes || null,
+    maintenance_notes: input.maintenanceNotes || null,
+    ...(input.contractPath !== undefined ? { contract_path: input.contractPath } : {}),
+  };
+}
+
+export async function createAccommodation(input: AccommodationInput): Promise<Result> {
+  if (!input.property.trim()) return { ok: false, error: 'Property name is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_travel');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('accommodations').insert({ family_id: g.session.familyId, ...accomFields(input) });
   if (error) return { ok: false, error: error.message };
   revalidatePath('/accommodation');
   return { ok: true };
@@ -137,18 +148,7 @@ export async function updateAccommodation(input: AccommodationInput & { id: stri
   if (!isSupabaseConfigured) return { ok: true };
   const g = await guard('manage_travel');
   if (!g.ok) return g;
-  const { error } = await g.supabase.from('accommodations').update({
-    student_id: input.studentId || null,
-    property: input.property.trim(),
-    address: input.address || null,
-    landlord: input.landlord || null,
-    contact: input.contact || null,
-    start_date: input.startDate || null,
-    end_date: input.endDate || null,
-    monthly_rent: input.monthlyRent ?? null,
-    deposit: input.deposit ?? null,
-    currency: input.currency || 'GBP',
-  }).eq('id', input.id);
+  const { error } = await g.supabase.from('accommodations').update(accomFields(input)).eq('id', input.id);
   if (error) return { ok: false, error: error.message };
   revalidatePath('/accommodation');
   return { ok: true };
@@ -161,6 +161,73 @@ export async function deleteAccommodation(id: string): Promise<Result> {
   const { error } = await g.supabase.from('accommodations').delete().eq('id', id);
   if (error) return { ok: false, error: error.message };
   revalidatePath('/accommodation');
+  return { ok: true };
+}
+
+export async function addAccommodationPhoto(accommodationId: string, storagePath: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_travel');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('accommodation_photos').insert({ accommodation_id: accommodationId, storage_path: storagePath });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/accommodation');
+  return { ok: true };
+}
+
+export async function deleteAccommodationPhoto(photoId: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_travel');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('accommodation_photos').delete().eq('id', photoId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/accommodation');
+  return { ok: true };
+}
+
+// ── Flights (belong to a trip) ────────────────────────────────────────────────
+export interface FlightInput {
+  tripId: string;
+  airline?: string;
+  flightNumber?: string;
+  bookingRef?: string;
+  departAirport?: string;
+  arriveAirport?: string;
+  departAt?: string | null;
+  arriveAt?: string | null;
+  terminal?: string;
+  seat?: string;
+  baggage?: string;
+}
+
+export async function addFlight(input: FlightInput): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_travel');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('flights').insert({
+    trip_id: input.tripId,
+    airline: input.airline || null,
+    flight_number: input.flightNumber || null,
+    booking_ref: input.bookingRef || null,
+    depart_airport: input.departAirport || null,
+    arrive_airport: input.arriveAirport || null,
+    depart_at: input.departAt || null,
+    arrive_at: input.arriveAt || null,
+    terminal: input.terminal || null,
+    seat: input.seat || null,
+    baggage: input.baggage || null,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/travel');
+  return { ok: true };
+}
+
+export async function deleteFlight(id: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_travel');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('flights').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/travel');
   return { ok: true };
 }
 
