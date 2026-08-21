@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Utensils, Shirt, Home, Phone, ChevronRight } from 'lucide-react';
+import { Utensils, Shirt, Home, Phone, ChevronRight, Plus } from 'lucide-react';
 import { getSessionUser } from '@/lib/session';
+import { can } from '@/lib/permissions';
 import { getGuides, getSupportCounts } from '@/lib/support-queries';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
+import { GuideFormDialog } from '@/components/support/guide-form-dialog';
 
 export const metadata: Metadata = { title: 'Support' };
 
@@ -13,6 +15,7 @@ export default async function SupportPage() {
   const session = await getSessionUser();
   if (!session) return null;
 
+  const canEdit = can(session.member.role, 'create_support');
   const [counts, laundry, home] = session.isDemo
     ? [{ recipes: 0, laundry: 0, home: 0 }, [], []]
     : await Promise.all([
@@ -20,6 +23,7 @@ export default async function SupportPage() {
         getGuides(session.familyId, 'laundry'),
         getGuides(session.familyId, 'home_basic'),
       ]);
+  const live = !session.isDemo;
 
   return (
     <div className="space-y-6">
@@ -39,8 +43,10 @@ export default async function SupportPage() {
         </Card>
       </Link>
 
-      <GuideSection icon={<Shirt className="size-5" />} title="Laundry" guides={laundry} />
-      <GuideSection icon={<Home className="size-5" />} title="Home Basics" guides={home} />
+      <GuideSection icon={<Shirt className="size-5" />} title="Laundry" guides={laundry}
+        action={canEdit && <GuideFormDialog live={live} kind="laundry" trigger={<button type="button" className="inline-flex items-center gap-1 text-xs font-semibold text-brand"><Plus className="size-3.5" /> Add</button>} />} />
+      <GuideSection icon={<Home className="size-5" />} title="Home Basics" guides={home}
+        action={canEdit && <GuideFormDialog live={live} kind="home_basic" trigger={<button type="button" className="inline-flex items-center gap-1 text-xs font-semibold text-brand"><Plus className="size-3.5" /> Add</button>} />} />
 
       <section className="space-y-2">
         <p className="px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Emergency &amp; Useful Info</p>
@@ -56,10 +62,13 @@ export default async function SupportPage() {
   );
 }
 
-function GuideSection({ icon, title, guides }: { icon: React.ReactNode; title: string; guides: Awaited<ReturnType<typeof getGuides>> }) {
+function GuideSection({ icon, title, guides, action }: { icon: React.ReactNode; title: string; guides: Awaited<ReturnType<typeof getGuides>>; action?: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <p className="flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{icon} {title}</p>
+      <div className="flex items-center justify-between px-1">
+        <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">{icon} {title}</p>
+        {action}
+      </div>
       {guides.length === 0 ? (
         <EmptyState title={`No ${title.toLowerCase()} guides yet`} />
       ) : (

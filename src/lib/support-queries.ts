@@ -119,7 +119,7 @@ export async function getGuides(familyId: string, kind: string): Promise<GuideCa
 }
 
 export interface GuideDetail {
-  id: string; title: string; description: string; warnings: string;
+  id: string; title: string; description: string; warnings: string; kind: string;
   steps: { no: number; body: string }[];
 }
 export async function getGuide(id: string): Promise<GuideDetail | null> {
@@ -127,7 +127,7 @@ export async function getGuide(id: string): Promise<GuideDetail | null> {
   if (!supabase) return null;
   const { data: g } = await supabase
     .from('support_guides')
-    .select('id, title, description, warnings, steps:support_steps(step_no, body)')
+    .select('id, title, description, warnings, kind, steps:support_steps(step_no, body)')
     .eq('id', id)
     .maybeSingle();
   if (!g) return null;
@@ -136,6 +136,7 @@ export async function getGuide(id: string): Promise<GuideDetail | null> {
     title: g.title,
     description: g.description ?? '',
     warnings: g.warnings ?? '',
+    kind: g.kind,
     steps: (((g.steps as { step_no: number; body: string }[]) ?? [])
       .sort((a, b) => a.step_no - b.step_no).map((s) => ({ no: s.step_no, body: s.body }))),
   };

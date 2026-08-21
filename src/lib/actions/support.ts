@@ -117,6 +117,70 @@ export async function deleteRecipe(id: string): Promise<Result> {
   return { ok: true };
 }
 
+export interface GuideInput {
+  title: string;
+  description?: string;
+  kind: string;   // 'laundry' | 'home_basic' | 'emergency' | 'washing_machine'
+  warnings?: string;
+  steps: string[];
+}
+
+export async function createGuide(input: GuideInput): Promise<Result> {
+  if (!input.title.trim()) return { ok: false, error: 'Title is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard();
+  if (!g.ok) return g;
+  const { data: guide, error } = await g.supabase.from('support_guides').insert({
+    family_id: g.session.familyId,
+    kind: input.kind,
+    title: input.title.trim(),
+    description: input.description || null,
+    warnings: input.warnings || null,
+    created_by: g.userId,
+  }).select('id').single();
+  if (error || !guide) return { ok: false, error: error?.message ?? 'Failed to create guide.' };
+
+  const steps = input.steps.filter((t) => t.trim());
+  if (steps.length) {
+    await g.supabase.from('support_steps').insert(steps.map((body, i) => ({ guide_id: guide.id, step_no: i + 1, body: body.trim() })));
+  }
+  revalidatePath('/support');
+  return { ok: true, id: guide.id };
+}
+
+export async function updateGuide(input: GuideInput & { id: string }): Promise<Result> {
+  if (!input.title.trim()) return { ok: false, error: 'Title is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard();
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('support_guides').update({
+    title: input.title.trim(),
+    description: input.description || null,
+    kind: input.kind,
+    warnings: input.warnings || null,
+  }).eq('id', input.id);
+  if (error) return { ok: false, error: error.message };
+
+  await g.supabase.from('support_steps').delete().eq('guide_id', input.id);
+  const steps = input.steps.filter((t) => t.trim());
+  if (steps.length) {
+    await g.supabase.from('support_steps').insert(steps.map((body, i) => ({ guide_id: input.id, step_no: i + 1, body: body.trim() })));
+  }
+  revalidatePath('/support');
+  revalidatePath(`/support/guides/${input.id}`);
+  return { ok: true, id: input.id };
+}
+
+export async function deleteGuide(id: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard();
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('support_guides').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/support');
+  return { ok: true };
+}
+
 /** Record a voice-note row after the audio has been uploaded to storage. */
 export async function saveRecipeVoiceNote(recipeId: string, storagePath: string, durationSec: number): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };
