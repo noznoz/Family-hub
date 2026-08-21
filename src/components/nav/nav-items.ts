@@ -1,7 +1,7 @@
 import {
   Home, MessageCircle, ListChecks, Wallet, LayoutGrid,
   Plane, FileText, LifeBuoy, Users, Building2, GraduationCap,
-  Award, Calendar, Settings, UserRound, MoonStar, type LucideIcon,
+  Award, Calendar, Settings, UserRound, MoonStar, ScrollText, type LucideIcon,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -31,5 +31,6 @@ export const moreNav: NavItem[] = [
   { href: '/university', label: 'University', icon: GraduationCap },
   { href: '/scholarship', label: 'Scholarship', icon: Award },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/audit', label: 'Activity log', icon: ScrollText },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

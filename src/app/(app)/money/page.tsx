@@ -14,9 +14,9 @@ export default async function MoneyPage() {
   if (!session) return null;
   const { member } = session;
 
-  const canViewFinances = can(member.role, 'view_student_finances');
-  const canManage = can(member.role, 'manage_student_finances');
-  const canApprove = can(member.role, 'approve_payment_requests');
+  const canViewFinances = can(member.role, 'view_student_finances', session.overrides);
+  const canManage = can(member.role, 'manage_student_finances', session.overrides);
+  const canApprove = can(member.role, 'approve_payment_requests', session.overrides);
   const isStudent = member.role === 'student';
 
   if (!canViewFinances && !isStudent) {

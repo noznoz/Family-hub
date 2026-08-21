@@ -11,8 +11,8 @@ export const metadata: Metadata = { title: 'Chat' };
 export default async function ChatPage() {
   const session = await getSessionUser();
   if (!session) return null;
-  const canSend = can(session.member.role, 'send_family_messages');
-  const canConvert = can(session.member.role, 'approve_payment_requests');
+  const canSend = can(session.member.role, 'send_family_messages', session.overrides);
+  const canConvert = can(session.member.role, 'approve_payment_requests', session.overrides);
 
   if (session.isDemo) {
     return (

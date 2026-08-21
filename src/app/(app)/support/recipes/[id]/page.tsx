@@ -35,7 +35,7 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   if (!session) return null;
   const recipe = await getRecipe(id);
   if (!recipe) notFound();
-  const canEdit = can(session.member.role, 'create_support');
+  const canEdit = can(session.member.role, 'create_support', session.overrides);
 
   return (
     <div className="space-y-5">

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionUser } from '@/lib/session';
 import { isSupabaseConfigured } from '@/lib/env';
-import { can, type SystemRole } from '@/lib/permissions';
+import { can, PERMISSIONS, ROLE_DEFAULTS, type Permission, type SystemRole } from '@/lib/permissions';
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -21,7 +21,7 @@ async function requireManage(): Promise<
 > {
   const session = await getSessionUser();
   if (!session) return { ok: false, error: 'Not signed in.' };
-  if (!can(session.member.role, 'manage_family_members')) {
+  if (!can(session.member.role, 'manage_family_members', session.overrides)) {
     return { ok: false, error: 'You do not have permission to manage family members.' };
   }
   const supabase = await createClient();
@@ -107,6 +107,60 @@ export async function setMemberStatus(memberId: string, status: 'active' | 'disa
   if (error) return { ok: false, error: error.message };
   await audit(guard.familyId, guard.actorId, 'member.status_change', memberId, { status });
 
+  revalidatePath('/family');
+  return { ok: true };
+}
+
+export interface MemberPermissionRow { key: Permission; label: string; roleDefault: boolean; effective: boolean; override: boolean | null }
+
+/** Load a member's permissions: role default, current override, effective value. */
+export async function getMemberPermissions(memberId: string, role: SystemRole): Promise<MemberPermissionRow[]> {
+  if (!isSupabaseConfigured) return [];
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const { data } = await supabase.from('member_permissions').select('permission_key, granted').eq('member_id', memberId);
+  const overrides = new Map<string, boolean>();
+  for (const p of data ?? []) overrides.set(p.permission_key, p.granted);
+  return PERMISSIONS.map((key) => {
+    const roleDefault = role === 'admin' ? true : ROLE_DEFAULTS[role].includes(key);
+    const override = overrides.has(key) ? overrides.get(key)! : null;
+    return { key, label: key, roleDefault, override, effective: override ?? roleDefault };
+  });
+}
+
+/** Set or clear (granted=null) a per-member permission override. */
+export async function setMemberPermission(memberId: string, key: Permission, granted: boolean | null): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const guard = await requireManage();
+  if (!guard.ok) return guard;
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+  if (granted === null) {
+    const { error } = await supabase.from('member_permissions').delete().eq('member_id', memberId).eq('permission_key', key);
+    if (error) return { ok: false, error: error.message };
+  } else {
+    const { error } = await supabase.from('member_permissions')
+      .upsert({ member_id: memberId, permission_key: key, granted, created_by: guard.actorId }, { onConflict: 'member_id,permission_key' });
+    if (error) return { ok: false, error: error.message };
+  }
+  await audit(guard.familyId, guard.actorId, 'member.permission_change', memberId, { key, granted });
+  revalidatePath('/family');
+  return { ok: true };
+}
+
+/** Set a member's relationship label (e.g. son, dad). */
+export async function setMemberRelationship(memberId: string, relationship: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const guard = await requireManage();
+  if (!guard.ok) return guard;
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+  const rel = relationship.trim().toLowerCase().replace(/\s+/g, '_');
+  await supabase.from('family_relationships').delete().eq('member_id', memberId);
+  if (rel) {
+    const { error } = await supabase.from('family_relationships').insert({ family_id: guard.familyId, member_id: memberId, relationship: rel });
+    if (error) return { ok: false, error: error.message };
+  }
   revalidatePath('/family');
   return { ok: true };
 }

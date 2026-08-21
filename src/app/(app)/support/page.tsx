@@ -15,7 +15,7 @@ export default async function SupportPage() {
   const session = await getSessionUser();
   if (!session) return null;
 
-  const canEdit = can(session.member.role, 'create_support');
+  const canEdit = can(session.member.role, 'create_support', session.overrides);
   const [counts, laundry, home] = session.isDemo
     ? [{ recipes: 0, laundry: 0, home: 0 }, [], []]
     : await Promise.all([

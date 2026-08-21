@@ -19,8 +19,8 @@ const expiryChip = { ok: 'success', soon: 'attention', expired: 'danger', none: 
 export default async function DocumentsPage() {
   const session = await getSessionUser();
   if (!session) return null;
-  const canView = can(session.member.role, 'view_documents') || can(session.member.role, 'manage_documents');
-  const canManage = can(session.member.role, 'manage_documents');
+  const canView = can(session.member.role, 'view_documents', session.overrides) || can(session.member.role, 'manage_documents', session.overrides);
+  const canManage = can(session.member.role, 'manage_documents', session.overrides);
 
   if (!canView && session.member.role !== 'student') {
     return (

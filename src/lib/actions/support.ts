@@ -11,7 +11,7 @@ type Result = { ok: true; id?: string } | { ok: false; error: string };
 async function guard() {
   const session = await getSessionUser();
   if (!session) return { ok: false as const, error: 'Not signed in.' };
-  if (!can(session.member.role, 'create_support')) return { ok: false as const, error: 'No permission to add support content.' };
+  if (!can(session.member.role, 'create_support', session.overrides)) return { ok: false as const, error: 'No permission to add support content.' };
   const supabase = await createClient();
   if (!supabase) return { ok: false as const, error: 'Backend unavailable.' };
   const { data: { user } } = await supabase.auth.getUser();

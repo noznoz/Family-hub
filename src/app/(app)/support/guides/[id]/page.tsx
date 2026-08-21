@@ -15,7 +15,7 @@ export default async function GuidePage({ params }: { params: Promise<{ id: stri
   const session = await getSessionUser();
   const guide = await getGuide(id);
   if (!guide) notFound();
-  const canEdit = !!session && can(session.member.role, 'create_support');
+  const canEdit = !!session && can(session.member.role, 'create_support', session.overrides);
 
   return (
     <div className="space-y-5">

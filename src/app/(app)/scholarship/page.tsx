@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: 'Scholarship' };
 export default async function ScholarshipPage() {
   const session = await getSessionUser();
   if (!session) return null;
-  const canManage = can(session.member.role, 'manage_scholarship');
+  const canManage = can(session.member.role, 'manage_scholarship', session.overrides);
   const students = session.isDemo ? [] : await getScholarshipInfo(session.familyId);
 
   return <ScholarshipManager students={students} live={!session.isDemo} canManage={canManage} />;

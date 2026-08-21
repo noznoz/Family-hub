@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: 'Accommodation' };
 export default async function AccommodationPage() {
   const session = await getSessionUser();
   if (!session) return null;
-  const canManage = can(session.member.role, 'manage_travel');
+  const canManage = can(session.member.role, 'manage_travel', session.overrides);
   const [list, students] = session.isDemo
     ? [[], []]
     : await Promise.all([getAccommodations(session.familyId), getStudentOptions(session.familyId)]);

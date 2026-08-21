@@ -11,7 +11,7 @@ type Result = { ok: true } | { ok: false; error: string };
 async function guard() {
   const session = await getSessionUser();
   if (!session) return { ok: false as const, error: 'Not signed in.' };
-  if (!can(session.member.role, 'manage_documents')) return { ok: false as const, error: 'No permission to manage documents.' };
+  if (!can(session.member.role, 'manage_documents', session.overrides)) return { ok: false as const, error: 'No permission to manage documents.' };
   const supabase = await createClient();
   if (!supabase) return { ok: false as const, error: 'Backend unavailable.' };
   const { data: { user } } = await supabase.auth.getUser();

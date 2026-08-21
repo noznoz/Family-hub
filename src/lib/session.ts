@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { isSupabaseConfigured } from '@/lib/env';
 import { demoMembers } from '@/lib/demo-data';
-import type { SystemRole } from '@/lib/permissions';
+import type { Permission, SystemRole } from '@/lib/permissions';
 import type { Member } from '@/lib/types';
 
 export const DEMO_COOKIE = 'fh_demo_member';
@@ -16,6 +16,8 @@ export interface SessionUser {
   familyId: string;
   memberId: string;
   isDemo: boolean;
+  /** Per-member permission overrides on top of role defaults (see permissions.can). */
+  overrides: Partial<Record<Permission, boolean>>;
 }
 
 /**
@@ -66,10 +68,20 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
       console.error('[getSessionUser] members query error:', error.code, error.message);
     }
     if (!data) return null;
+
+    // Per-member permission overrides (grant/revoke on top of the role).
+    const overrides: Partial<Record<Permission, boolean>> = {};
+    const { data: perms } = await supabase
+      .from('member_permissions')
+      .select('permission_key, granted')
+      .eq('member_id', data.id);
+    for (const p of perms ?? []) overrides[p.permission_key as Permission] = p.granted;
+
     return {
       isDemo: false,
       familyId: data.family_id,
       memberId: data.id,
+      overrides,
       member: {
         id: data.id,
         displayName: data.display_name,
@@ -85,5 +97,5 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
   const store = await cookies();
   const id = store.get(DEMO_COOKIE)?.value ?? 'd';
   const member = demoMembers.find((m) => m.id === id) ?? demoMembers[0]!;
-  return { isDemo: true, familyId: DEMO_FAMILY_ID, memberId: member.id, member };
+  return { isDemo: true, familyId: DEMO_FAMILY_ID, memberId: member.id, member, overrides: {} };
 });

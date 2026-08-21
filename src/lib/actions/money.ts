@@ -40,7 +40,7 @@ export async function createExpense(input: ExpenseInput): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };
   const c = await ctx();
   if (!c) return { ok: false, error: 'Not signed in.' };
-  if (!can(c.session.member.role, 'manage_student_finances')) return { ok: false, error: 'No permission to add expenses.' };
+  if (!can(c.session.member.role, 'manage_student_finances', c.session.overrides)) return { ok: false, error: 'No permission to add expenses.' };
 
   const { error } = await c.supabase.from('expenses').insert({
     family_id: c.session.familyId,
@@ -64,7 +64,7 @@ export async function setBudget(studentId: string, amount: number, currency = 'G
   if (!isSupabaseConfigured) return { ok: true };
   const c = await ctx();
   if (!c) return { ok: false, error: 'Not signed in.' };
-  if (!can(c.session.member.role, 'manage_student_finances')) return { ok: false, error: 'No permission to set budgets.' };
+  if (!can(c.session.member.role, 'manage_student_finances', c.session.overrides)) return { ok: false, error: 'No permission to set budgets.' };
 
   const monthStart = new Date();
   monthStart.setDate(1);
@@ -92,7 +92,7 @@ export async function updateExpense(input: UpdateExpenseInput): Promise<Result> 
   if (!isSupabaseConfigured) return { ok: true };
   const c = await ctx();
   if (!c) return { ok: false, error: 'Not signed in.' };
-  if (!can(c.session.member.role, 'manage_student_finances')) return { ok: false, error: 'No permission to edit expenses.' };
+  if (!can(c.session.member.role, 'manage_student_finances', c.session.overrides)) return { ok: false, error: 'No permission to edit expenses.' };
 
   const { error } = await c.supabase.from('expenses').update({
     student_id: input.studentId,
@@ -111,7 +111,7 @@ export async function deleteExpense(id: string): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };
   const c = await ctx();
   if (!c) return { ok: false, error: 'Not signed in.' };
-  if (!can(c.session.member.role, 'manage_student_finances')) return { ok: false, error: 'No permission to delete expenses.' };
+  if (!can(c.session.member.role, 'manage_student_finances', c.session.overrides)) return { ok: false, error: 'No permission to delete expenses.' };
   const { error } = await c.supabase.from('expenses').delete().eq('id', id);
   if (error) return { ok: false, error: error.message };
   await audit(c.session.familyId, c.userId, 'expense.delete', 'expense', id, {});
@@ -180,7 +180,7 @@ async function canEditRequest(
     .from('payment_requests').select('requested_by, status').eq('id', id).maybeSingle();
   if (!row) return { ok: false, error: 'Request not found.' };
   const isOwner = row.requested_by === c.session.memberId;
-  const isApprover = can(c.session.member.role, 'approve_payment_requests');
+  const isApprover = can(c.session.member.role, 'approve_payment_requests', c.session.overrides);
   if (!isOwner && !isApprover) return { ok: false, error: 'No permission.' };
   return { ok: true, status: row.status };
 }
@@ -226,7 +226,7 @@ export async function decidePaymentRequest(id: string, decision: 'approved' | 'r
   if (!isSupabaseConfigured) return { ok: true };
   const c = await ctx();
   if (!c) return { ok: false, error: 'Not signed in.' };
-  if (!can(c.session.member.role, 'approve_payment_requests')) return { ok: false, error: 'No permission to approve.' };
+  if (!can(c.session.member.role, 'approve_payment_requests', c.session.overrides)) return { ok: false, error: 'No permission to approve.' };
 
   const { data: reqRow } = await c.supabase.from('payment_requests').select('requested_by, amount, currency, reason').eq('id', id).maybeSingle();
   const { error } = await c.supabase
@@ -247,7 +247,7 @@ export async function markPaid(id: string, alsoCreateExpense: boolean): Promise<
   if (!isSupabaseConfigured) return { ok: true };
   const c = await ctx();
   if (!c) return { ok: false, error: 'Not signed in.' };
-  if (!can(c.session.member.role, 'approve_payment_requests')) return { ok: false, error: 'No permission.' };
+  if (!can(c.session.member.role, 'approve_payment_requests', c.session.overrides)) return { ok: false, error: 'No permission.' };
 
   const { data: req, error: rerr } = await c.supabase
     .from('payment_requests').select('*').eq('id', id).single();

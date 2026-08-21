@@ -15,7 +15,7 @@ export default async function RecipesPage() {
   const session = await getSessionUser();
   if (!session) return null;
   const recipes = session.isDemo ? [] : await getRecipes(session.familyId);
-  const canCreate = can(session.member.role, 'create_support');
+  const canCreate = can(session.member.role, 'create_support', session.overrides);
 
   return (
     <div className="space-y-4">

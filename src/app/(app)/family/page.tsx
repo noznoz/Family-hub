@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: 'Family' };
 export default async function FamilyPage() {
   const session = await getSessionUser();
   if (!session) return null;
-  const canManage = can(session.member.role, 'manage_family_members');
+  const canManage = can(session.member.role, 'manage_family_members', session.overrides);
   const members = session.isDemo ? demoMembers : await getFamilyMembers(session.familyId);
 
   return (
