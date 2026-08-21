@@ -53,6 +53,35 @@ export async function createTask(input: CreateTaskInput): Promise<Result> {
   return { ok: true };
 }
 
+export interface UpdateTaskInput extends CreateTaskInput {
+  id: string;
+}
+
+/** Update a task's editable fields. */
+export async function updateTask(input: UpdateTaskInput): Promise<Result> {
+  if (!input.title.trim()) return { ok: false, error: 'Title is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({
+      title: input.title.trim(),
+      description: input.description?.trim() || null,
+      priority: input.priority,
+      due_date: input.dueDate || null,
+      student_id: input.studentId || null,
+      assignee_id: input.assigneeId || null,
+    })
+    .eq('id', input.id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath('/tasks');
+  revalidatePath('/home');
+  return { ok: true };
+}
+
 /** Update a task's status; sets completed_at when moving to done. */
 export async function setTaskStatus(id: string, status: TaskStatus): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };

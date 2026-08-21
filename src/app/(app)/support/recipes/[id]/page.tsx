@@ -8,6 +8,7 @@ import { getRecipe } from '@/lib/support-queries';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { VoiceRecorder } from '@/components/support/voice-recorder';
+import { RecipeHeaderActions } from '@/components/support/recipe-header-actions';
 
 export const metadata: Metadata = { title: 'Recipe' };
 
@@ -31,7 +32,10 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
           <div className="flex h-40 w-full items-center justify-center bg-muted"><ChefHat className="size-10 text-navy-200" /></div>
         )}
         <div className="p-5">
-          <h1 className="text-2xl font-extrabold tracking-tight text-navy">{recipe.name}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-2xl font-extrabold tracking-tight text-navy">{recipe.name}</h1>
+            {canEdit && <RecipeHeaderActions recipe={recipe} live={!session.isDemo} />}
+          </div>
           {recipe.description && <p className="mt-1 text-sm text-muted-foreground">{recipe.description}</p>}
           <div className="mt-3 flex flex-wrap gap-1.5">
             <Chip tone="neutral" className="capitalize">{recipe.category.replace(/_/g, ' ')}</Chip>

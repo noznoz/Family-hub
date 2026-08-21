@@ -57,6 +57,41 @@ export async function createExpense(input: ExpenseInput): Promise<Result> {
   return { ok: true };
 }
 
+export interface UpdateExpenseInput extends ExpenseInput {
+  id: string;
+}
+
+export async function updateExpense(input: UpdateExpenseInput): Promise<Result> {
+  if (!input.amount || input.amount <= 0) return { ok: false, error: 'Enter a valid amount.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const c = await ctx();
+  if (!c) return { ok: false, error: 'Not signed in.' };
+  if (!can(c.session.member.role, 'manage_student_finances')) return { ok: false, error: 'No permission to edit expenses.' };
+
+  const { error } = await c.supabase.from('expenses').update({
+    student_id: input.studentId,
+    category: input.category,
+    amount: input.amount,
+    description: input.description || null,
+    spent_on: input.spentOn || undefined,
+  }).eq('id', input.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/money');
+  return { ok: true };
+}
+
+export async function deleteExpense(id: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const c = await ctx();
+  if (!c) return { ok: false, error: 'Not signed in.' };
+  if (!can(c.session.member.role, 'manage_student_finances')) return { ok: false, error: 'No permission to delete expenses.' };
+  const { error } = await c.supabase.from('expenses').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  await audit(c.session.familyId, c.userId, 'expense.delete', 'expense', id, {});
+  revalidatePath('/money');
+  return { ok: true };
+}
+
 export interface RequestInput {
   studentId: string;
   amount: number;
@@ -99,6 +134,62 @@ export async function createPaymentRequest(input: RequestInput): Promise<Result>
       .map((a) => sendPushToMember(a.id, { title: 'New payment request', body: `${who} requested ${input.currency || 'GBP'} ${input.amount} — ${input.reason.trim()}`, url: '/money' })));
   } catch {}
 
+  revalidatePath('/money');
+  revalidatePath('/home');
+  return { ok: true };
+}
+
+export interface UpdateRequestInput extends RequestInput {
+  id: string;
+}
+
+/** Can the current member change this request? The requester (while still
+ *  pending) or anyone who can approve requests. */
+async function canEditRequest(
+  c: NonNullable<Awaited<ReturnType<typeof ctx>>>,
+  id: string,
+): Promise<{ ok: boolean; status?: string; error?: string }> {
+  const { data: row } = await c.supabase
+    .from('payment_requests').select('requested_by, status').eq('id', id).maybeSingle();
+  if (!row) return { ok: false, error: 'Request not found.' };
+  const isOwner = row.requested_by === c.session.memberId;
+  const isApprover = can(c.session.member.role, 'approve_payment_requests');
+  if (!isOwner && !isApprover) return { ok: false, error: 'No permission.' };
+  return { ok: true, status: row.status };
+}
+
+export async function updatePaymentRequest(input: UpdateRequestInput): Promise<Result> {
+  if (!input.amount || input.amount <= 0) return { ok: false, error: 'Enter a valid amount.' };
+  if (!input.reason.trim()) return { ok: false, error: 'Add a reason.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const c = await ctx();
+  if (!c) return { ok: false, error: 'Not signed in.' };
+  const gate = await canEditRequest(c, input.id);
+  if (!gate.ok) return { ok: false, error: gate.error! };
+  if (gate.status !== 'requested') return { ok: false, error: 'Only pending requests can be edited.' };
+
+  const { error } = await c.supabase.from('payment_requests').update({
+    student_id: input.studentId,
+    amount: input.amount,
+    reason: input.reason.trim(),
+    category: input.category,
+    urgency: input.urgency,
+    note: input.note || null,
+  }).eq('id', input.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/money');
+  return { ok: true };
+}
+
+export async function deletePaymentRequest(id: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const c = await ctx();
+  if (!c) return { ok: false, error: 'Not signed in.' };
+  const gate = await canEditRequest(c, id);
+  if (!gate.ok) return { ok: false, error: gate.error! };
+  const { error } = await c.supabase.from('payment_requests').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  await audit(c.session.familyId, c.userId, 'payment.delete', 'payment_request', id, {});
   revalidatePath('/money');
   revalidatePath('/home');
   return { ok: true };

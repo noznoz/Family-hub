@@ -65,6 +65,58 @@ export async function createRecipe(input: RecipeInput): Promise<Result> {
   return { ok: true, id: rec.id };
 }
 
+export interface UpdateRecipeInput extends RecipeInput {
+  id: string;
+}
+
+/** Update a recipe and replace its ingredients/steps. */
+export async function updateRecipe(input: UpdateRecipeInput): Promise<Result> {
+  if (!input.name.trim()) return { ok: false, error: 'Name is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard();
+  if (!g.ok) return g;
+
+  const { error } = await g.supabase.from('recipes').update({
+    name: input.name.trim(),
+    description: input.description || null,
+    category: input.category || 'family_favorites',
+    prep_minutes: input.prep ?? null,
+    cook_minutes: input.cook ?? null,
+    difficulty: input.difficulty || 'easy',
+    servings: input.servings ?? null,
+  }).eq('id', input.id);
+  if (error) return { ok: false, error: error.message };
+
+  // Replace child rows so removals/reorders are reflected.
+  await g.supabase.from('recipe_ingredients').delete().eq('recipe_id', input.id);
+  const ingredients = input.ingredients.filter((t) => t.trim());
+  if (ingredients.length) {
+    await g.supabase.from('recipe_ingredients').insert(
+      ingredients.map((text, i) => ({ recipe_id: input.id, sort_order: i, text: text.trim() })),
+    );
+  }
+  await g.supabase.from('recipe_steps').delete().eq('recipe_id', input.id);
+  const steps = input.steps.filter((t) => t.trim());
+  if (steps.length) {
+    await g.supabase.from('recipe_steps').insert(
+      steps.map((body, i) => ({ recipe_id: input.id, step_no: i + 1, body: body.trim() })),
+    );
+  }
+  revalidatePath('/support/recipes');
+  revalidatePath(`/support/recipes/${input.id}`);
+  return { ok: true, id: input.id };
+}
+
+export async function deleteRecipe(id: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard();
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('recipes').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/support/recipes');
+  return { ok: true };
+}
+
 /** Record a voice-note row after the audio has been uploaded to storage. */
 export async function saveRecipeVoiceNote(recipeId: string, storagePath: string, durationSec: number): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };

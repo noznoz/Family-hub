@@ -23,6 +23,7 @@ export type ExpiryState = 'ok' | 'soon' | 'expired' | 'none';
 
 export interface DocView {
   id: string; name: string; category: string; student: string | null;
+  studentId: string | null; expiryDate: string | null;
   expiry: string | null; expiryState: ExpiryState; notes: string;
   visibility: string; url: string | null; uploadedOn: string;
 }
@@ -40,7 +41,7 @@ export async function getDocuments(familyId: string): Promise<DocView[]> {
   if (!supabase) return [];
   const { data } = await supabase
     .from('documents')
-    .select('id, name, category, expiry_date, notes, visibility, created_at, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), versions:document_versions(storage_path, version)')
+    .select('id, name, category, expiry_date, notes, visibility, created_at, student_id, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), versions:document_versions(storage_path, version)')
     .eq('family_id', familyId)
     .order('created_at', { ascending: false });
 
@@ -52,6 +53,8 @@ export async function getDocuments(familyId: string): Promise<DocView[]> {
       name: d.name,
       category: d.category,
       student: one<{ member: { display_name: string } | null }>(d.student)?.member?.display_name ?? null,
+      studentId: (d as { student_id?: string | null }).student_id ?? null,
+      expiryDate: d.expiry_date ?? null,
       expiry: d.expiry_date ? new Date(d.expiry_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null,
       expiryState: expiryState(d.expiry_date),
       notes: d.notes ?? '',

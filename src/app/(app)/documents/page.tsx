@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DocumentUploadDialog } from '@/components/documents/document-upload-dialog';
+import { DocumentRowActions } from '@/components/documents/document-row-actions';
 
 export const metadata: Metadata = { title: 'Documents' };
 
@@ -59,6 +60,7 @@ export default async function DocumentsPage() {
                 <a href={d.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${d.name}`}
                   className="shrink-0 rounded-lg p-2 text-brand hover:bg-muted"><ExternalLink className="size-5" /></a>
               )}
+              {canManage && <DocumentRowActions doc={d} students={students} live={!session.isDemo} />}
             </div>
           ))}
         </Card>

@@ -2,13 +2,16 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, HandCoins, Check, X, Banknote } from 'lucide-react';
+import { Plus, HandCoins, Check, X, Banknote, Pencil } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { DeleteButton } from '@/components/ui/delete-button';
 import { formatMoney, cn } from '@/lib/utils';
-import { decidePaymentRequest, markPaid } from '@/lib/actions/money';
+import {
+  decidePaymentRequest, markPaid, deleteExpense, deletePaymentRequest,
+} from '@/lib/actions/money';
 import { MoneyFormDialog } from './money-form-dialog';
 import type { Expense, PaymentRequest } from '@/lib/types';
 
@@ -112,6 +115,23 @@ export function MoneyView({
                   </div>
                 </div>
                 <span className="shrink-0 font-bold text-navy">{formatMoney(e.amount, e.currency)}</span>
+                {canManage && (
+                  <div className="flex shrink-0 items-center">
+                    <MoneyFormDialog
+                      live={live} students={students} mode="expense" editExpense={e}
+                      trigger={
+                        <button type="button" aria-label="Edit expense" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 transition-colors hover:bg-muted hover:text-navy">
+                          <Pencil className="size-4" />
+                        </button>
+                      }
+                    />
+                    <DeleteButton
+                      itemLabel="this expense" title="Delete expense"
+                      onConfirm={() => (live ? deleteExpense(e.id) : Promise.resolve())}
+                      onDeleted={() => router.refresh()}
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </Card>
@@ -138,6 +158,23 @@ export function MoneyView({
                   <Chip tone="navy">{r.student}</Chip>
                   <Chip tone="neutral">{r.category}</Chip>
                   <span className="text-xs text-muted-foreground">by {r.requestedBy}</span>
+                  {r.status === 'requested' && (canApprove || isStudent) && (
+                    <span className="ml-auto flex items-center">
+                      <MoneyFormDialog
+                        live={live} students={students} mode="request" editRequest={r}
+                        trigger={
+                          <button type="button" aria-label="Edit request" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 transition-colors hover:bg-muted hover:text-navy">
+                            <Pencil className="size-4" />
+                          </button>
+                        }
+                      />
+                      <DeleteButton
+                        itemLabel="this request" title="Delete request"
+                        onConfirm={() => (live ? deletePaymentRequest(r.id) : Promise.resolve())}
+                        onDeleted={() => router.refresh()}
+                      />
+                    </span>
+                  )}
                 </div>
                 {canApprove && r.status === 'requested' && (
                   <div className="mt-3 flex gap-2">

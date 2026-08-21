@@ -43,6 +43,10 @@ export interface Task {
   due?: string | null;
   priority: TaskPriority;
   status: TaskStatus;
+  // Raw fields for editing (not shown directly).
+  dueDate?: string | null;
+  studentId?: string | null;
+  assigneeId?: string | null;
 }
 
 export interface Message {
@@ -63,6 +67,8 @@ export interface Expense {
   description: string;
   spentOn: string;
   fundingLabel: string;
+  studentId?: string | null;
+  spentOnDate?: string | null;
 }
 
 export interface PaymentRequest {
@@ -75,6 +81,8 @@ export interface PaymentRequest {
   urgency: TaskPriority;
   requestedBy: string;
   status: RequestStatus;
+  studentId?: string | null;
+  note?: string | null;
 }
 
 export interface AttentionItem {

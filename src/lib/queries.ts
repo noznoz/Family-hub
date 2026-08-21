@@ -130,7 +130,7 @@ export async function getTasks(familyId: string): Promise<Task[]> {
   if (!supabase) return [];
   const { data } = await supabase
     .from('tasks')
-    .select('id, title, description, priority, status, due_date, assignee:family_members!tasks_assignee_id_fkey(display_name), student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name))')
+    .select('id, title, description, priority, status, due_date, assignee_id, student_id, assignee:family_members!tasks_assignee_id_fkey(display_name), student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name))')
     .eq('family_id', familyId)
     .order('due_date', { ascending: true });
 
@@ -145,6 +145,9 @@ export async function getTasks(familyId: string): Promise<Task[]> {
       due: t.due_date ? dueLabel(t.due_date) : null,
       priority: t.priority as TaskPriority,
       status: t.status as TaskStatus,
+      dueDate: t.due_date ?? null,
+      studentId: (t as { student_id?: string | null }).student_id ?? null,
+      assigneeId: (t as { assignee_id?: string | null }).assignee_id ?? null,
     };
   });
 }
@@ -198,7 +201,7 @@ export async function getExpenses(familyId: string, student?: 'Hamza' | 'Omar'):
   if (!supabase) return [];
   const { data } = await supabase
     .from('expenses')
-    .select('id, category, amount, currency, description, spent_on, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), funding:funding_sources(label)')
+    .select('id, category, amount, currency, description, spent_on, student_id, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), funding:funding_sources(label)')
     .eq('family_id', familyId)
     .order('spent_on', { ascending: false })
     .limit(50);
@@ -215,6 +218,8 @@ export async function getExpenses(familyId: string, student?: 'Hamza' | 'Omar'):
         description: e.description ?? '',
         spentOn: dueLabel(e.spent_on),
         fundingLabel: one<{ label: string }>(e.funding)?.label ?? 'Unassigned',
+        studentId: (e as { student_id?: string | null }).student_id ?? null,
+        spentOnDate: e.spent_on ?? null,
       };
     })
     .filter((e) => !student || e.student === student);
@@ -225,7 +230,7 @@ export async function getPaymentRequests(familyId: string, student?: 'Hamza' | '
   if (!supabase) return [];
   const { data } = await supabase
     .from('payment_requests')
-    .select('id, amount, currency, reason, category, urgency, status, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), requested_by:family_members!payment_requests_requested_by_fkey(display_name)')
+    .select('id, amount, currency, reason, category, urgency, status, note, student_id, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), requested_by:family_members!payment_requests_requested_by_fkey(display_name)')
     .eq('family_id', familyId)
     .order('created_at', { ascending: false });
 
@@ -242,6 +247,8 @@ export async function getPaymentRequests(familyId: string, student?: 'Hamza' | '
         urgency: r.urgency as TaskPriority,
         requestedBy: one<{ display_name: string }>(r.requested_by)?.display_name ?? '—',
         status: r.status as PaymentRequest['status'],
+        studentId: (r as { student_id?: string | null }).student_id ?? null,
+        note: (r as { note?: string | null }).note ?? null,
       };
     })
     .filter((r) => !student || r.student === student);

@@ -1,13 +1,14 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Plus, Check } from 'lucide-react';
+import { Plus, Check, Pencil } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { DeleteButton } from '@/components/ui/delete-button';
 import { cn } from '@/lib/utils';
-import { setTaskStatus } from '@/lib/actions/tasks';
+import { setTaskStatus, deleteTask } from '@/lib/actions/tasks';
 import { TaskCreateDialog } from './task-create-dialog';
 import type { Task, TaskPriority, TaskStatus } from '@/lib/types';
 
@@ -64,6 +65,8 @@ export function TasksView({
   };
 
   const onCreated = (t: Task) => setTasks((ts) => [t, ...ts]);
+  const onSaved = (t: Task) => setTasks((ts) => ts.map((x) => (x.id === t.id ? t : x)));
+  const onDeleted = (id: string) => setTasks((ts) => ts.filter((t) => t.id !== id));
 
   return (
     <div className="space-y-4">
@@ -121,6 +124,26 @@ export function TasksView({
                   {t.status !== 'done' && <Chip tone="brand">{statusLabel[t.status]}</Chip>}
                   {t.due && <span className="text-xs font-semibold text-muted-foreground">{t.due}</span>}
                 </div>
+              </div>
+              <div className="flex shrink-0 items-center">
+                <TaskCreateDialog
+                  live={live}
+                  students={students}
+                  members={members}
+                  task={t}
+                  onSaved={onSaved}
+                  trigger={
+                    <button type="button" aria-label="Edit task" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 transition-colors hover:bg-muted hover:text-navy">
+                      <Pencil className="size-4" />
+                    </button>
+                  }
+                />
+                <DeleteButton
+                  itemLabel={`“${t.title}”`}
+                  title="Delete task"
+                  onConfirm={() => (live ? deleteTask(t.id) : Promise.resolve())}
+                  onDeleted={() => onDeleted(t.id)}
+                />
               </div>
             </Card>
           ))}

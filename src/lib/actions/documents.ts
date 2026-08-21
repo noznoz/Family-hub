@@ -70,6 +70,40 @@ export async function createDocument(input: DocInput): Promise<Result> {
   return { ok: true };
 }
 
+export interface UpdateDocInput {
+  id: string;
+  name: string;
+  category: string;
+  studentId?: string | null;
+  visibility: string;
+  expiry?: string | null;
+  notes?: string;
+}
+
+/** Edit a document's metadata (no re-upload). */
+export async function updateDocument(input: UpdateDocInput): Promise<Result> {
+  if (!input.name.trim()) return { ok: false, error: 'Name is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard();
+  if (!g.ok) return g;
+
+  const { error } = await g.supabase.from('documents').update({
+    name: input.name.trim(),
+    category: input.category,
+    student_id: input.studentId || null,
+    visibility: input.visibility,
+    expiry_date: input.expiry || null,
+    notes: input.notes || null,
+  }).eq('id', input.id);
+  if (error) return { ok: false, error: error.message };
+
+  await g.supabase.from('audit_logs').insert({
+    family_id: g.session.familyId, actor_id: g.userId, action: 'document.update', entity: 'document', entity_id: input.id, meta: {},
+  });
+  revalidatePath('/documents');
+  return { ok: true };
+}
+
 export async function deleteDocument(id: string): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };
   const g = await guard();
