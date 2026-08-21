@@ -17,6 +17,7 @@ export interface Member {
   inviteEmail?: string | null;
   status?: string;
   linked?: boolean;
+  theme?: string | null;
 }
 
 export interface StudentSummary {

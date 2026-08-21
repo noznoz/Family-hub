@@ -9,6 +9,7 @@ import { PERMISSION_LABELS } from '@/lib/permissions';
 import { ROLE_DEFAULTS } from '@/lib/permissions';
 import { EnableNotifications } from '@/components/pwa/enable-notifications';
 import { ThemePicker } from '@/components/settings/theme-picker';
+import { resolveTheme } from '@/lib/theme';
 import { signOut } from './actions';
 
 export const metadata: Metadata = { title: 'Settings' };
@@ -38,7 +39,7 @@ export default async function SettingsPage() {
         <p className="mb-3 px-1 text-xs text-muted-foreground">
           Pick your look — it applies to your account only. Everyone in the family can choose their own.
         </p>
-        <ThemePicker />
+        <ThemePicker initial={resolveTheme(member.theme)} />
       </div>
 
       <div>

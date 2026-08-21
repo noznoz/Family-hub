@@ -5,6 +5,7 @@ import './globals.css';
 import { env } from '@/lib/env';
 import { PwaRegister } from '@/components/pwa/pwa-register';
 import { THEME_COOKIE, resolveTheme } from '@/lib/theme';
+import { getSessionUser } from '@/lib/session';
 
 const appUrl = env.NEXT_PUBLIC_PRODUCTION_DOMAIN || env.NEXT_PUBLIC_APP_URL;
 
@@ -42,7 +43,10 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const store = await cookies();
-  const theme = resolveTheme(store.get(THEME_COOKIE)?.value);
+  // The account's saved theme wins (follows the member across devices); the
+  // cookie is the fast fallback and the store for demo mode / signed-out pages.
+  const session = await getSessionUser().catch(() => null);
+  const theme = resolveTheme(session?.member.theme ?? store.get(THEME_COOKIE)?.value);
   return (
     <html lang="en" data-theme={theme} className={fontVars}>
       <body>

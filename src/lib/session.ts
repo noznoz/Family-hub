@@ -43,12 +43,24 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
 
     // No profiles join here: it's unused in the shell and an embed error would
     // make the whole query fail (returning null → endless redirect to /welcome).
-    const { data, error } = await supabase
+    const cols = 'id, family_id, display_name, role, is_student, theme';
+    let { data, error } = await supabase
       .from('family_members')
-      .select('id, family_id, display_name, role, is_student')
+      .select(cols)
       .eq('profile_id', user.id)
       .eq('status', 'active')
       .maybeSingle();
+
+    // Insurance: if the `theme` column hasn't been migrated yet (42703), retry
+    // without it so appearance-personalization never bricks sign-in.
+    if (error?.code === '42703') {
+      ({ data, error } = await supabase
+        .from('family_members')
+        .select('id, family_id, display_name, role, is_student')
+        .eq('profile_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle());
+    }
 
     if (error) {
       console.error('[getSessionUser] members query error:', error.code, error.message);
@@ -63,6 +75,7 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
         displayName: data.display_name,
         role: data.role as SystemRole,
         isStudent: data.is_student,
+        theme: (data as { theme?: string | null }).theme ?? null,
         avatarUrl: null,
       },
     };

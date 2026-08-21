@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { Check } from 'lucide-react';
 import { THEMES, THEME_COOKIE, DEFAULT_THEME, type ThemeId } from '@/lib/theme';
+import { saveTheme } from '@/lib/actions/theme';
 import { cn } from '@/lib/utils';
 
 function readThemeCookie(): ThemeId {
@@ -18,13 +19,19 @@ function readThemeCookie(): ThemeId {
  * cookie is read server-side on the next load so the choice sticks (and there's
  * no flash of the wrong theme).
  */
-export function ThemePicker() {
-  const [active, setActive] = useState<ThemeId>(readThemeCookie);
+export function ThemePicker({ initial }: { initial?: ThemeId }) {
+  const [active, setActive] = useState<ThemeId>(initial ?? readThemeCookie);
+  const [, startTransition] = useTransition();
 
   function choose(id: ThemeId) {
     setActive(id);
+    // Apply instantly (no reload) and cache in the cookie for the next paint…
     document.documentElement.setAttribute('data-theme', id);
     document.cookie = `${THEME_COOKIE}=${id}; path=/; max-age=31536000; samesite=lax`;
+    // …then persist to the member's account so it follows them across devices.
+    startTransition(() => {
+      void saveTheme(id);
+    });
   }
 
   return (
