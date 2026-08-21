@@ -16,41 +16,50 @@ function fmtDate(d: string | null): string {
 export interface TripView {
   id: string; title: string; origin: string; destination: string;
   departLabel: string; departRaw: string | null; travelers: string[]; upcoming: boolean;
+  destAddress: string; notes: string; memberIds: string[];
 }
 export async function getTrips(familyId: string): Promise<TripView[]> {
   const supabase = await createClient();
   if (!supabase) return [];
   const { data } = await supabase
     .from('trips')
-    .select('id, title, origin, destination, depart_at, members:trip_members(member:family_members!trip_members_member_id_fkey(display_name))')
+    .select('id, title, origin, destination, depart_at, dest_address, notes, members:trip_members(member:family_members!trip_members_member_id_fkey(id, display_name))')
     .eq('family_id', familyId)
     .order('depart_at', { ascending: true });
   const now = Date.now();
-  return (data ?? []).map((t) => ({
-    id: t.id,
-    title: t.title,
-    origin: t.origin ?? '',
-    destination: t.destination ?? '',
-    departLabel: t.depart_at ? dueLabel(t.depart_at) : 'No date',
-    departRaw: t.depart_at,
-    travelers: ((t.members as unknown as { member: unknown }[] | null) ?? [])
-      .map((m) => one<{ display_name: string }>(m.member)?.display_name ?? '')
-      .filter(Boolean),
-    upcoming: t.depart_at ? new Date(t.depart_at).getTime() > now : false,
-  }));
+  return (data ?? []).map((t) => {
+    const members = ((t.members as unknown as { member: unknown }[] | null) ?? [])
+      .map((m) => one<{ id: string; display_name: string }>(m.member))
+      .filter((m): m is { id: string; display_name: string } => !!m);
+    return {
+      id: t.id,
+      title: t.title,
+      origin: t.origin ?? '',
+      destination: t.destination ?? '',
+      departLabel: t.depart_at ? dueLabel(t.depart_at) : 'No date',
+      departRaw: t.depart_at,
+      travelers: members.map((m) => m.display_name),
+      memberIds: members.map((m) => m.id),
+      destAddress: (t as { dest_address?: string | null }).dest_address ?? '',
+      notes: (t as { notes?: string | null }).notes ?? '',
+      upcoming: t.depart_at ? new Date(t.depart_at).getTime() > now : false,
+    };
+  });
 }
 
 // ── Accommodation ───────────────────────────────────────────────────────────
 export interface AccommodationView {
   id: string; property: string; address: string; landlord: string;
   start: string; end: string; rent: string; student: string; current: boolean;
+  studentId: string | null; contact: string; startDate: string | null; endDate: string | null;
+  rentAmount: number | null; deposit: number | null; currency: string;
 }
 export async function getAccommodations(familyId: string): Promise<AccommodationView[]> {
   const supabase = await createClient();
   if (!supabase) return [];
   const { data } = await supabase
     .from('accommodations')
-    .select('id, property, address, landlord, start_date, end_date, monthly_rent, currency, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name))')
+    .select('id, property, address, landlord, contact, start_date, end_date, monthly_rent, deposit, currency, student_id, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name))')
     .eq('family_id', familyId)
     .order('start_date', { ascending: false });
   const today = new Date().toISOString().slice(0, 10);
@@ -64,6 +73,13 @@ export async function getAccommodations(familyId: string): Promise<Accommodation
     rent: a.monthly_rent ? `${a.currency ?? 'GBP'} ${a.monthly_rent}/mo` : '—',
     student: one<{ member: { display_name: string } | null }>(a.student)?.member?.display_name ?? '',
     current: (!a.end_date || a.end_date >= today) && (!a.start_date || a.start_date <= today),
+    studentId: (a as { student_id?: string | null }).student_id ?? null,
+    contact: (a as { contact?: string | null }).contact ?? '',
+    startDate: a.start_date ?? null,
+    endDate: a.end_date ?? null,
+    rentAmount: a.monthly_rent != null ? Number(a.monthly_rent) : null,
+    deposit: (a as { deposit?: number | null }).deposit != null ? Number((a as { deposit?: number | null }).deposit) : null,
+    currency: a.currency ?? 'GBP',
   }));
 }
 
@@ -125,13 +141,16 @@ export async function getScholarshipInfo(familyId: string): Promise<ScholarshipV
 }
 
 // ── Calendar ────────────────────────────────────────────────────────────────
-export interface CalEvent { id: string; title: string; kind: string; when: string; whenRaw: string; student: string | null }
+export interface CalEvent {
+  id: string; title: string; kind: string; when: string; whenRaw: string; student: string | null;
+  studentId: string | null; startsAtInput: string;
+}
 export async function getCalendar(familyId: string): Promise<CalEvent[]> {
   const supabase = await createClient();
   if (!supabase) return [];
   const { data } = await supabase
     .from('calendar_events')
-    .select('id, title, kind, starts_at, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name))')
+    .select('id, title, kind, starts_at, student_id, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name))')
     .eq('family_id', familyId)
     .gte('starts_at', new Date(Date.now() - 86_400_000).toISOString())
     .order('starts_at', { ascending: true })
@@ -143,7 +162,17 @@ export async function getCalendar(familyId: string): Promise<CalEvent[]> {
     when: dueLabel(e.starts_at),
     whenRaw: fmtDate(e.starts_at),
     student: one<{ member: { display_name: string } | null }>(e.student)?.member?.display_name ?? null,
+    studentId: (e as { student_id?: string | null }).student_id ?? null,
+    // Local datetime for <input type="datetime-local"> (YYYY-MM-DDTHH:mm).
+    startsAtInput: e.starts_at ? toLocalInput(e.starts_at) : '',
   }));
+}
+
+/** ISO timestamp → value for <input type="datetime-local"> in local time. */
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // ── Notifications ────────────────────────────────────────────────────────────
