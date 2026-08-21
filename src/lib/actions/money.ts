@@ -32,6 +32,7 @@ export interface ExpenseInput {
   currency?: string;
   description?: string;
   spentOn?: string;
+  receiptPath?: string | null;
 }
 
 export async function createExpense(input: ExpenseInput): Promise<Result> {
@@ -50,10 +51,35 @@ export async function createExpense(input: ExpenseInput): Promise<Result> {
     currency: input.currency || 'GBP',
     description: input.description || null,
     spent_on: input.spentOn || new Date().toISOString().slice(0, 10),
+    receipt_path: input.receiptPath || null,
     created_by: c.userId,
   });
   if (error) return { ok: false, error: error.message };
   revalidatePath('/money');
+  return { ok: true };
+}
+
+/** Set (or clear) a student's budget for the current month. */
+export async function setBudget(studentId: string, amount: number, currency = 'GBP'): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const c = await ctx();
+  if (!c) return { ok: false, error: 'Not signed in.' };
+  if (!can(c.session.member.role, 'manage_student_finances')) return { ok: false, error: 'No permission to set budgets.' };
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  const month = monthStart.toISOString().slice(0, 10);
+
+  const { error } = await c.supabase.from('budgets').upsert({
+    family_id: c.session.familyId,
+    student_id: studentId,
+    month,
+    amount,
+    currency,
+  }, { onConflict: 'student_id,month' });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/money');
+  revalidatePath('/home');
   return { ok: true };
 }
 
@@ -74,6 +100,7 @@ export async function updateExpense(input: UpdateExpenseInput): Promise<Result> 
     amount: input.amount,
     description: input.description || null,
     spent_on: input.spentOn || undefined,
+    ...(input.receiptPath !== undefined ? { receipt_path: input.receiptPath } : {}),
   }).eq('id', input.id);
   if (error) return { ok: false, error: error.message };
   revalidatePath('/money');

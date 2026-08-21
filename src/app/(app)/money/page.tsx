@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Lock } from 'lucide-react';
 import { getSessionUser } from '@/lib/session';
 import { can } from '@/lib/permissions';
-import { getExpenses, getPaymentRequests, getStudents } from '@/lib/queries';
+import { getExpenses, getPaymentRequests, getStudents, getBudgets, type BudgetSnapshot } from '@/lib/queries';
 import { demoBudgets, demoExpenses, demoRequests, demoStudents } from '@/lib/demo-data';
 import { MoneyView } from '@/components/money/money-view';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -31,23 +31,33 @@ export default async function MoneyPage() {
 
   const onlyStudent = isStudent ? (member.displayName as 'Hamza' | 'Omar') : null;
 
-  const [expenses, requests, students] = session.isDemo
+  const [expenses, requests, students, budgets] = session.isDemo
     ? [
         onlyStudent ? demoExpenses.filter((e) => e.student === onlyStudent) : demoExpenses,
         onlyStudent ? demoRequests.filter((r) => r.student === onlyStudent) : demoRequests,
         demoStudents.map((s) => ({ id: s.id, name: s.name })),
+        demoStudents.map((s): BudgetSnapshot => ({
+          studentId: s.id, name: s.name,
+          budget: demoBudgets[s.name as 'Hamza' | 'Omar']?.budget ?? 0,
+          spent: demoBudgets[s.name as 'Hamza' | 'Omar']?.spent ?? 0,
+          currency: demoBudgets[s.name as 'Hamza' | 'Omar']?.currency ?? 'GBP',
+        })),
       ]
     : await Promise.all([
         getExpenses(session.familyId, onlyStudent ?? undefined),
         getPaymentRequests(session.familyId, onlyStudent ?? undefined),
         getStudents(session.familyId).then((ss) => ss.map((s) => ({ id: s.id, name: s.name }))),
+        getBudgets(session.familyId),
       ]);
+
+  const shownBudgets = onlyStudent ? budgets.filter((b) => b.name === onlyStudent) : budgets;
 
   return (
     <MoneyView
       live={!session.isDemo}
       meId={session.memberId}
-      budgets={demoBudgets}
+      familyId={session.familyId}
+      budgets={shownBudgets}
       expenses={expenses}
       requests={requests}
       students={students}

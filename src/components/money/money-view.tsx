@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, HandCoins, Check, X, Banknote, Pencil } from 'lucide-react';
+import { Plus, HandCoins, Check, X, Banknote, Pencil, Wallet, Paperclip } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
@@ -15,18 +15,20 @@ import {
   decidePaymentRequest, markPaid, deleteExpense, deletePaymentRequest,
 } from '@/lib/actions/money';
 import { MoneyFormDialog } from './money-form-dialog';
+import { BudgetDialog } from './budget-dialog';
 import type { Expense, PaymentRequest } from '@/lib/types';
+import type { BudgetSnapshot } from '@/lib/queries';
 
-type Budgets = Record<'Hamza' | 'Omar', { budget: number; spent: number; currency: string }>;
 const TABS = ['Overview', 'Expenses', 'Requests'] as const;
 type Tab = (typeof TABS)[number];
 
 export function MoneyView({
-  live, meId, budgets, expenses, requests, students, onlyStudent, canManage, canApprove, isStudent,
+  live, meId, familyId, budgets, expenses, requests, students, onlyStudent, canManage, canApprove, isStudent,
 }: {
   live: boolean;
   meId: string;
-  budgets: Budgets;
+  familyId: string;
+  budgets: BudgetSnapshot[];
   expenses: Expense[];
   requests: PaymentRequest[];
   students: { id: string; name: string }[];
@@ -38,8 +40,6 @@ export function MoneyView({
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('Overview');
   const [pending, startTransition] = useTransition();
-  const studentNames = (onlyStudent ? [onlyStudent] : (['Hamza', 'Omar'] as const));
-
   const act = (fn: () => Promise<unknown>) => startTransition(async () => { await fn(); router.refresh(); });
 
   return (
@@ -50,6 +50,7 @@ export function MoneyView({
         <MoneyFormDialog
           live={live}
           students={students}
+          familyId={familyId}
           mode={isStudent ? 'request' : 'expense'}
           defaultStudentId={onlyStudent ? students.find((s) => s.name === onlyStudent)?.id : undefined}
           trigger={
@@ -77,24 +78,45 @@ export function MoneyView({
 
       {tab === 'Overview' && (
         <div className="grid gap-3 md:grid-cols-2">
-          {studentNames.map((name) => {
-            const b = budgets[name];
-            const spent = expenses.filter((e) => e.student === name).reduce((s, e) => s + e.amount, b ? 0 : 0) || b.spent;
-            const remaining = b.budget - spent;
-            const pct = Math.min(100, Math.round((spent / b.budget) * 100));
+          {budgets.map((b) => {
+            const hasBudget = b.budget > 0;
+            const remaining = b.budget - b.spent;
+            const pct = hasBudget ? Math.min(100, Math.round((b.spent / b.budget) * 100)) : 0;
             return (
-              <Card key={name} className="p-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="font-bold text-navy">{name}</p>
-                  <Chip tone={remaining < 0 ? 'danger' : 'success'}>{formatMoney(remaining, b.currency)} left</Chip>
+              <Card key={b.studentId} className="p-5">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <p className="font-bold text-navy">{b.name}</p>
+                  <div className="flex items-center gap-1">
+                    {hasBudget && <Chip tone={remaining < 0 ? 'danger' : 'success'}>{formatMoney(remaining, b.currency)} left</Chip>}
+                    {canManage && (
+                      <BudgetDialog
+                        live={live} studentId={b.studentId} name={b.name} current={b.budget} currency={b.currency}
+                        trigger={<button type="button" aria-label="Set budget" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>}
+                      />
+                    )}
+                  </div>
                 </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                  <div className={cn('h-full rounded-full', pct > 90 ? 'bg-danger' : 'bg-brand')} style={{ width: `${pct}%` }} />
-                </div>
-                <div className="mt-2 flex justify-between text-xs font-semibold text-muted-foreground">
-                  <span>Spent {formatMoney(spent, b.currency)}</span>
-                  <span>Budget {formatMoney(b.budget, b.currency)}</span>
-                </div>
+                {hasBudget ? (
+                  <>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                      <div className={cn('h-full rounded-full', pct > 90 ? 'bg-danger' : 'bg-brand')} style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className="mt-2 flex justify-between text-xs font-semibold text-muted-foreground">
+                      <span>Spent {formatMoney(b.spent, b.currency)}</span>
+                      <span>Budget {formatMoney(b.budget, b.currency)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">Spent {formatMoney(b.spent, b.currency)} this month</p>
+                    {canManage && (
+                      <BudgetDialog
+                        live={live} studentId={b.studentId} name={b.name} current={0} currency={b.currency}
+                        trigger={<Button variant="subtle" size="sm"><Wallet className="size-4" /> Set budget</Button>}
+                      />
+                    )}
+                  </div>
+                )}
               </Card>
             );
           })}
@@ -115,6 +137,11 @@ export function MoneyView({
                     <Chip tone="neutral">{e.category}</Chip>
                     <Chip tone={e.fundingLabel.includes('Scholarship') ? 'success' : 'brand'}>{e.fundingLabel}</Chip>
                     <span className="text-xs text-muted-foreground">{e.spentOn}</span>
+                    {e.receiptUrl && (
+                      <a href={e.receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
+                        <Paperclip className="size-3" /> Receipt
+                      </a>
+                    )}
                   </div>
                 </div>
                 <span className="shrink-0 font-bold text-navy">{formatMoney(e.amount, e.currency)}</span>
@@ -125,7 +152,7 @@ export function MoneyView({
                 {canManage && (
                   <div className="flex shrink-0 items-center">
                     <MoneyFormDialog
-                      live={live} students={students} mode="expense" editExpense={e}
+                      live={live} students={students} familyId={familyId} mode="expense" editExpense={e}
                       trigger={
                         <button type="button" aria-label="Edit expense" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 transition-colors hover:bg-muted hover:text-navy">
                           <Pencil className="size-4" />

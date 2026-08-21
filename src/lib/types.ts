@@ -69,6 +69,7 @@ export interface Expense {
   fundingLabel: string;
   studentId?: string | null;
   spentOnDate?: string | null;
+  receiptUrl?: string | null;
 }
 
 export interface PaymentRequest {

@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Paperclip } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Field, Select } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { uploadMedia } from '@/lib/storage';
 import {
   createExpense, createPaymentRequest, updateExpense, updatePaymentRequest,
 } from '@/lib/actions/money';
@@ -16,7 +18,7 @@ const CATEGORIES: ExpenseCategory[] = [
 ];
 
 export function MoneyFormDialog({
-  trigger, live, students, mode, defaultStudentId, editExpense, editRequest,
+  trigger, live, students, mode, defaultStudentId, editExpense, editRequest, familyId,
 }: {
   trigger: React.ReactNode;
   live: boolean;
@@ -25,11 +27,14 @@ export function MoneyFormDialog({
   defaultStudentId?: string;
   editExpense?: Expense;
   editRequest?: PaymentRequest;
+  familyId?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const isRequest = mode === 'request';
   const isEdit = !!editExpense || !!editRequest;
   const initialStudentId = editExpense?.studentId ?? editRequest?.studentId ?? defaultStudentId;
@@ -51,11 +56,18 @@ export function MoneyFormDialog({
           ? await updatePaymentRequest({ id: editRequest.id, studentId, amount, reason: description || 'Payment request', category, urgency })
           : await createPaymentRequest({ studentId, amount, reason: description || 'Payment request', category, urgency });
       } else {
+        let receiptPath: string | null | undefined;
+        if (receipt && live && familyId) {
+          const safe = receipt.name.replace(/[^\w.\-]+/g, '_');
+          receiptPath = await uploadMedia(familyId, receipt, `receipts/${Date.now()}-${safe}`);
+          if (!receiptPath) return setError('Receipt upload failed. Try again.');
+        }
         res = editExpense
-          ? await updateExpense({ id: editExpense.id, studentId, amount, category, description })
-          : await createExpense({ studentId, amount, category, description });
+          ? await updateExpense({ id: editExpense.id, studentId, amount, category, description, ...(receiptPath ? { receiptPath } : {}) })
+          : await createExpense({ studentId, amount, category, description, receiptPath });
       }
       if (!res.ok) return setError(res.error);
+      setReceipt(null);
       setOpen(false);
       router.refresh();
     });
@@ -103,6 +115,15 @@ export function MoneyFormDialog({
                 <option value="urgent">Urgent</option>
               </Select>
             </Field>
+          )}
+          {!isRequest && (
+            <div>
+              <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden onChange={(e) => setReceipt(e.target.files?.[0] ?? null)} />
+              <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-3 py-2.5 text-sm font-semibold text-navy hover:bg-muted">
+                <Paperclip className="size-4 text-navy-400" />
+                {receipt ? receipt.name : editExpense?.receiptUrl ? 'Replace receipt' : 'Attach receipt (optional)'}
+              </button>
+            </div>
           )}
           {!live && <p className="rounded-lg bg-brand-muted px-3 py-2 text-xs text-navy">Demo mode — not saved.</p>}
           {error && <p className="text-sm font-medium text-danger">{error}</p>}

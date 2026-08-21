@@ -6,6 +6,16 @@ import type {
 } from '@/lib/types';
 import type { SystemRole } from '@/lib/permissions';
 import { dueLabel } from '@/lib/utils';
+import { env } from '@/lib/env';
+
+/** Sign a private media object (receipts live in the media bucket). */
+async function signMedia(path: string | null | undefined): Promise<string | null> {
+  if (!path) return null;
+  const supabase = await createClient();
+  if (!supabase) return null;
+  const { data } = await supabase.storage.from(env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET).createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
+}
 
 /**
  * Live data access. Every read runs through the authenticated Supabase client,
@@ -201,28 +211,66 @@ export async function getExpenses(familyId: string, student?: 'Hamza' | 'Omar'):
   if (!supabase) return [];
   const { data } = await supabase
     .from('expenses')
-    .select('id, category, amount, currency, description, spent_on, student_id, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), funding:funding_sources(label)')
+    .select('id, category, amount, currency, description, spent_on, student_id, receipt_path, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), funding:funding_sources(label)')
     .eq('family_id', familyId)
     .order('spent_on', { ascending: false })
     .limit(50);
 
-  return (data ?? [])
-    .map((e) => {
-      const name = one<{ member: { display_name: string } | null }>(e.student)?.member?.display_name;
-      return {
-        id: e.id,
-        student: (name === 'Hamza' || name === 'Omar' ? name : 'Hamza') as 'Hamza' | 'Omar',
-        category: e.category as ExpenseCategory,
-        amount: Number(e.amount),
-        currency: e.currency,
-        description: e.description ?? '',
-        spentOn: dueLabel(e.spent_on),
-        fundingLabel: one<{ label: string }>(e.funding)?.label ?? 'Unassigned',
-        studentId: (e as { student_id?: string | null }).student_id ?? null,
-        spentOnDate: e.spent_on ?? null,
-      };
-    })
-    .filter((e) => !student || e.student === student);
+  const mapped = await Promise.all((data ?? []).map(async (e) => {
+    const name = one<{ member: { display_name: string } | null }>(e.student)?.member?.display_name;
+    return {
+      id: e.id,
+      student: (name === 'Hamza' || name === 'Omar' ? name : 'Hamza') as 'Hamza' | 'Omar',
+      category: e.category as ExpenseCategory,
+      amount: Number(e.amount),
+      currency: e.currency,
+      description: e.description ?? '',
+      spentOn: dueLabel(e.spent_on),
+      fundingLabel: one<{ label: string }>(e.funding)?.label ?? 'Unassigned',
+      studentId: (e as { student_id?: string | null }).student_id ?? null,
+      spentOnDate: e.spent_on ?? null,
+      receiptUrl: await signMedia((e as { receipt_path?: string | null }).receipt_path),
+    };
+  }));
+  return mapped.filter((e) => !student || e.student === student);
+}
+
+export interface BudgetSnapshot { studentId: string; name: string; budget: number; spent: number; currency: string }
+
+/** Current-month budget vs actual spend, per student. */
+export async function getBudgets(familyId: string): Promise<BudgetSnapshot[]> {
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  const monthIso = monthStart.toISOString().slice(0, 10);
+
+  const [studentsRes, budgetsRes, expensesRes] = await Promise.all([
+    supabase.from('student_profiles').select('id, member:family_members!student_profiles_member_id_fkey(display_name)').eq('family_id', familyId),
+    supabase.from('budgets').select('student_id, amount, currency').eq('family_id', familyId).eq('month', monthIso),
+    supabase.from('expenses').select('student_id, amount, currency').eq('family_id', familyId).gte('spent_on', monthIso),
+  ]);
+
+  const budgetByStudent = new Map<string, { amount: number; currency: string }>();
+  for (const b of budgetsRes.data ?? []) budgetByStudent.set(b.student_id, { amount: Number(b.amount), currency: b.currency });
+  const spentByStudent = new Map<string, number>();
+  let anyCurrency = 'GBP';
+  for (const e of expensesRes.data ?? []) {
+    if (!e.student_id) continue;
+    spentByStudent.set(e.student_id, (spentByStudent.get(e.student_id) ?? 0) + Number(e.amount ?? 0));
+    anyCurrency = e.currency ?? anyCurrency;
+  }
+
+  return (studentsRes.data ?? []).map((s) => {
+    const b = budgetByStudent.get(s.id);
+    return {
+      studentId: s.id,
+      name: one<{ display_name: string }>(s.member)?.display_name ?? 'Student',
+      budget: b?.amount ?? 0,
+      spent: spentByStudent.get(s.id) ?? 0,
+      currency: b?.currency ?? anyCurrency,
+    };
+  });
 }
 
 export async function getPaymentRequests(familyId: string, student?: 'Hamza' | 'Omar'): Promise<PaymentRequest[]> {
