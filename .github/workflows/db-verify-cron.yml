@@ -1,0 +1,26 @@
+name: DB verify cron
+on:
+  push:
+    branches: ['claude/family-hub-pwa-build-j1eivv']
+    paths: ['.github/db-verify-cron.trigger']
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Verify reminders scheduler
+        env:
+          RAW_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          DB_URL=$(printf '%s' "$RAW_DB_URL" | tr -d '\r\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+          PGCRON=$(psql "$DB_URL" -tA -c "select count(*) from pg_extension where extname='pg_cron';")
+          PGNET=$(psql "$DB_URL" -tA -c "select count(*) from pg_extension where extname='pg_net';")
+          JOB=$(psql "$DB_URL" -tA -c "select count(*) from cron.job where jobname='family-hub-reminders';" 2>/dev/null || echo "0")
+          echo "pg_cron=$PGCRON pg_net=$PGNET job=$JOB"
+          if [ "$PGCRON" != "1" ]; then echo "::error::pg_cron extension is NOT installed."; exit 1; fi
+          if [ "$PGNET" != "1" ]; then echo "::error::pg_net extension is NOT installed."; exit 1; fi
+          if [ "$JOB" != "1" ]; then echo "::error::reminders cron job is NOT scheduled."; exit 1; fi
+          echo "All good: pg_cron + pg_net installed and reminders job scheduled."
