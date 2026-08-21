@@ -104,6 +104,42 @@ export async function updateDocument(input: UpdateDocInput): Promise<Result> {
   return { ok: true };
 }
 
+/** Upload a new version of a document (bumps the version number). */
+export async function addDocumentVersion(input: {
+  documentId: string; storagePath: string; fileName?: string; mimeType?: string; sizeBytes?: number;
+}): Promise<Result> {
+  if (!input.storagePath) return { ok: false, error: 'Upload the file first.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard();
+  if (!g.ok) return g;
+  const { data: latest } = await g.supabase
+    .from('document_versions').select('version').eq('document_id', input.documentId)
+    .order('version', { ascending: false }).limit(1).maybeSingle();
+  const nextVersion = (latest?.version ?? 0) + 1;
+  const { error } = await g.supabase.from('document_versions').insert({
+    document_id: input.documentId, version: nextVersion, storage_path: input.storagePath,
+    file_name: input.fileName || null, mime_type: input.mimeType || null, size_bytes: input.sizeBytes || null,
+    uploaded_by: g.userId,
+  });
+  if (error) return { ok: false, error: error.message };
+  await g.supabase.from('documents').update({ updated_at: new Date().toISOString() }).eq('id', input.documentId);
+  revalidatePath('/documents');
+  return { ok: true };
+}
+
+/** Replace the set of members a 'selected_members' document is shared with. */
+export async function setDocumentShares(documentId: string, memberIds: string[]): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard();
+  if (!g.ok) return g;
+  await g.supabase.from('document_shares').delete().eq('document_id', documentId);
+  if (memberIds.length) {
+    await g.supabase.from('document_shares').insert(memberIds.map((member_id) => ({ document_id: documentId, member_id })));
+  }
+  revalidatePath('/documents');
+  return { ok: true };
+}
+
 export async function deleteDocument(id: string): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };
   const g = await guard();

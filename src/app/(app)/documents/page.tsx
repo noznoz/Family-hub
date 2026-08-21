@@ -3,6 +3,7 @@ import { FileText, ExternalLink, ShieldCheck } from 'lucide-react';
 import { getSessionUser } from '@/lib/session';
 import { can } from '@/lib/permissions';
 import { getDocuments, getStudentOptions } from '@/lib/document-queries';
+import { getFamilyMembers } from '@/lib/queries';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -30,9 +31,13 @@ export default async function DocumentsPage() {
     );
   }
 
-  const [docs, students] = session.isDemo
-    ? [[], []]
-    : await Promise.all([getDocuments(session.familyId), getStudentOptions(session.familyId)]);
+  const [docs, students, members] = session.isDemo
+    ? [[], [], []]
+    : await Promise.all([
+        getDocuments(session.familyId),
+        getStudentOptions(session.familyId),
+        getFamilyMembers(session.familyId).then((ms) => ms.map((m) => ({ id: m.id, name: m.displayName }))),
+      ]);
 
   return (
     <div className="space-y-4">
@@ -56,6 +61,7 @@ export default async function DocumentsPage() {
                   {d.expiry && <Chip tone={expiryChip[d.expiryState]}>
                     {d.expiryState === 'expired' ? 'Expired' : 'Expires'} {d.expiry}
                   </Chip>}
+                  {d.versionCount > 1 && <Chip tone="neutral">v{d.versionCount}</Chip>}
                 </div>
               </div>
               {d.url && (
@@ -64,7 +70,7 @@ export default async function DocumentsPage() {
               )}
               <ShareButton text={`📄 Document: ${d.name} (${d.category})${d.expiry ? ` · ${d.expiryState === 'expired' ? 'expired' : 'expires'} ${d.expiry}` : ''}`} url="/documents" />
               <ReminderButton entityType="document" entityId={d.id} title={d.name} link="/documents" live={!session.isDemo} meId={session.memberId} />
-              {canManage && <DocumentRowActions doc={d} students={students} live={!session.isDemo} />}
+              {canManage && <DocumentRowActions doc={d} students={students} members={members} familyId={session.familyId} live={!session.isDemo} />}
             </div>
           ))}
         </Card>

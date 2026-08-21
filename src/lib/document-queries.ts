@@ -26,6 +26,7 @@ export interface DocView {
   studentId: string | null; expiryDate: string | null;
   expiry: string | null; expiryState: ExpiryState; notes: string;
   visibility: string; url: string | null; uploadedOn: string;
+  versionCount: number; sharedMemberIds: string[];
 }
 
 function expiryState(date: string | null): ExpiryState {
@@ -41,7 +42,7 @@ export async function getDocuments(familyId: string): Promise<DocView[]> {
   if (!supabase) return [];
   const { data } = await supabase
     .from('documents')
-    .select('id, name, category, expiry_date, notes, visibility, created_at, student_id, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), versions:document_versions(storage_path, version)')
+    .select('id, name, category, expiry_date, notes, visibility, created_at, student_id, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), versions:document_versions(storage_path, version), shares:document_shares(member_id)')
     .eq('family_id', familyId)
     .order('created_at', { ascending: false });
 
@@ -61,6 +62,8 @@ export async function getDocuments(familyId: string): Promise<DocView[]> {
       visibility: d.visibility,
       url: await signed(versions[0]?.storage_path),
       uploadedOn: new Date(d.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+      versionCount: versions.length,
+      sharedMemberIds: (((d as { shares?: { member_id: string }[] }).shares) ?? []).map((s) => s.member_id),
     };
   }));
 }
