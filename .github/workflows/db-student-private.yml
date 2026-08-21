@@ -1,0 +1,25 @@
+name: DB student-private migration
+on:
+  push:
+    branches: ['claude/family-hub-pwa-build-j1eivv']
+    paths: ['.github/db-student-private.trigger']
+  workflow_dispatch:
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Apply student-private migration
+        env:
+          RAW_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$RAW_DB_URL" ]; then echo "::error::SUPABASE_DB_URL secret is not set."; exit 1; fi
+          DB_URL=$(printf '%s' "$RAW_DB_URL" | tr -d '\r\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrate_student_private.sql
+          HASTBL=$(psql "$DB_URL" -tA -c "select count(*) from information_schema.tables where table_schema='public' and table_name='student_private';")
+          HASFN=$(psql "$DB_URL" -tA -c "select count(*) from pg_proc where proname='can_see_student_private';")
+          if [ "$HASTBL" != "1" ]; then echo "::error::student_private table missing."; exit 1; fi
+          if [ "$HASFN" != "1" ]; then echo "::error::can_see_student_private function missing."; exit 1; fi
+          echo "student_private table + policy function created."
