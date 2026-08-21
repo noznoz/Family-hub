@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell } from 'lucide-react';
+import { Bell, Search } from 'lucide-react';
 import { AppLogo } from '@/components/brand/app-logo';
 import { Avatar } from '@/components/ui/avatar';
 
@@ -13,6 +13,9 @@ export function AppHeader({ name }: { name: string }) {
         <span className="font-extrabold tracking-tight text-navy">Family Hub</span>
       </Link>
       <div className="flex items-center gap-3">
+        <Link href="/search" aria-label="Search" className="rounded-full p-1.5 hover:bg-muted">
+          <Search className="size-5 text-navy" />
+        </Link>
         <Link href="/notifications" aria-label="Notifications" className="relative rounded-full p-1.5 hover:bg-muted">
           <Bell className="size-5 text-navy" />
           <span className="absolute right-1 top-1 size-2 rounded-full bg-danger" />
