@@ -9,6 +9,7 @@ import { PERMISSION_LABELS } from '@/lib/permissions';
 import { ROLE_DEFAULTS } from '@/lib/permissions';
 import { EnableNotifications } from '@/components/pwa/enable-notifications';
 import { ThemePicker } from '@/components/settings/theme-picker';
+import { LanguagePicker } from '@/components/settings/language-picker';
 import { resolveTheme } from '@/lib/theme';
 import { signOut } from './actions';
 
@@ -40,6 +41,8 @@ export default async function SettingsPage() {
           Pick your look — it applies to your account only. Everyone in the family can choose their own.
         </p>
         <ThemePicker initial={resolveTheme(member.theme)} />
+        <p className="mb-2 mt-4 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Language</p>
+        <LanguagePicker />
       </div>
 
       <div>

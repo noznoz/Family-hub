@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { primaryNav, moreNav } from './nav-items';
+import { tNav, type Locale } from '@/lib/locale';
 import { cn } from '@/lib/utils';
 import { AppLogo } from '@/components/brand/app-logo';
 
-export function Sidebar() {
+export function Sidebar({ locale = 'en' }: { locale?: Locale }) {
   const pathname = usePathname();
   const items = [...primaryNav.filter((i) => i.href !== '/more'), ...moreNav];
   return (
@@ -29,7 +30,7 @@ export function Sidebar() {
               aria-current={active ? 'page' : undefined}
             >
               <Icon className="size-5" />
-              {label}
+              {tNav(label, locale)}
             </Link>
           );
         })}

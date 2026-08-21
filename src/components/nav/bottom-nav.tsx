@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { primaryNav } from './nav-items';
+import { tNav, type Locale } from '@/lib/locale';
 import { cn } from '@/lib/utils';
 
-export function BottomNav() {
+export function BottomNav({ locale = 'en' }: { locale?: Locale }) {
   const pathname = usePathname();
   return (
     <nav
@@ -27,7 +28,7 @@ export function BottomNav() {
                 aria-current={active ? 'page' : undefined}
               >
                 <Icon className={cn('size-6', active && 'stroke-[2.5]')} />
-                {label}
+                {tNav(label, locale)}
               </Link>
             </li>
           );

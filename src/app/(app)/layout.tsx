@@ -1,6 +1,8 @@
+import { cookies } from 'next/headers';
 import { getSessionUser } from '@/lib/session';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { LOCALE_COOKIE, resolveLocale } from '@/lib/locale';
 import { Sidebar } from '@/components/nav/sidebar';
 import { BottomNav } from '@/components/nav/bottom-nav';
 import { AppHeader } from '@/components/nav/app-header';
@@ -32,16 +34,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     );
   }
 
+  const locale = resolveLocale((await cookies()).get(LOCALE_COOKIE)?.value);
+
   return (
     <div className="flex min-h-dvh">
-      <Sidebar />
+      <Sidebar locale={locale} />
       <div className="flex min-w-0 flex-1 flex-col">
         <OfflineIndicator />
         <AppHeader name={session.member.displayName} />
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-24 pt-4 md:px-8 md:pb-10 md:pt-8">
           {children}
         </main>
-        <BottomNav />
+        <BottomNav locale={locale} />
       </div>
     </div>
   );

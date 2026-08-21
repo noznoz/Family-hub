@@ -5,6 +5,7 @@ import './globals.css';
 import { env } from '@/lib/env';
 import { PwaRegister } from '@/components/pwa/pwa-register';
 import { THEME_COOKIE, resolveTheme } from '@/lib/theme';
+import { LOCALE_COOKIE, resolveLocale, dirFor } from '@/lib/locale';
 import { getSessionUser } from '@/lib/session';
 
 const appUrl = env.NEXT_PUBLIC_PRODUCTION_DOMAIN || env.NEXT_PUBLIC_APP_URL;
@@ -47,8 +48,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // cookie is the fast fallback and the store for demo mode / signed-out pages.
   const session = await getSessionUser().catch(() => null);
   const theme = resolveTheme(session?.member.theme ?? store.get(THEME_COOKIE)?.value);
+  const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
   return (
-    <html lang="en" data-theme={theme} className={fontVars}>
+    <html lang={locale} dir={dirFor(locale)} data-theme={theme} className={fontVars}>
       <body>
         {children}
         <PwaRegister />
