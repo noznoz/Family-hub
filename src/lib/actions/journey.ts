@@ -216,3 +216,239 @@ export async function deleteCalendarEvent(id: string): Promise<Result> {
   revalidatePath('/calendar');
   return { ok: true };
 }
+
+// ── University: student academics + academic years ────────────────────────────
+export interface StudentAcademicsInput {
+  studentId: string;
+  course?: string;
+  studentRef?: string;
+  universityName?: string;
+}
+
+export async function updateStudentAcademics(input: StudentAcademicsInput): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('admin_parent');
+  if (!g.ok) return g;
+
+  let universityId: string | undefined;
+  const name = input.universityName?.trim();
+  if (name) {
+    const { data: existing } = await g.supabase
+      .from('universities').select('id').eq('family_id', g.session.familyId).ilike('name', name).maybeSingle();
+    if (existing) universityId = existing.id;
+    else {
+      const { data: created } = await g.supabase
+        .from('universities').insert({ family_id: g.session.familyId, name }).select('id').single();
+      universityId = created?.id;
+    }
+  }
+
+  const { error } = await g.supabase.from('student_profiles').update({
+    course: input.course || null,
+    student_ref: input.studentRef || null,
+    ...(universityId ? { university_id: universityId } : {}),
+  }).eq('id', input.studentId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/university');
+  return { ok: true };
+}
+
+export interface AcademicYearInput {
+  studentId: string;
+  label: string;
+  studyYear?: number | null;
+  status: string;
+}
+
+export async function addAcademicYear(input: AcademicYearInput): Promise<Result> {
+  if (!input.label.trim()) return { ok: false, error: 'Label is required (e.g. 2026/27).' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('admin_parent');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('academic_years').insert({
+    student_id: input.studentId,
+    label: input.label.trim(),
+    study_year: input.studyYear ?? null,
+    status: input.status || 'upcoming',
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/university');
+  return { ok: true };
+}
+
+export async function updateAcademicYear(input: AcademicYearInput & { id: string }): Promise<Result> {
+  if (!input.label.trim()) return { ok: false, error: 'Label is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('admin_parent');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('academic_years').update({
+    label: input.label.trim(),
+    study_year: input.studyYear ?? null,
+    status: input.status || 'upcoming',
+  }).eq('id', input.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/university');
+  return { ok: true };
+}
+
+export async function deleteAcademicYear(id: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('admin_parent');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('academic_years').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/university');
+  return { ok: true };
+}
+
+// ── Scholarship: scholarship, requirements, funding ───────────────────────────
+async function ensureScholarship(
+  supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>,
+  studentId: string,
+): Promise<string | null> {
+  const { data: existing } = await supabase
+    .from('scholarships').select('id').eq('student_id', studentId)
+    .order('start_date', { ascending: false }).limit(1).maybeSingle();
+  if (existing) return existing.id;
+  const { data: created } = await supabase
+    .from('scholarships').insert({ student_id: studentId, stage: 'family_funded' }).select('id').single();
+  return created?.id ?? null;
+}
+
+export async function upsertScholarship(input: { studentId: string; id?: string; sponsor?: string; stage: string }): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_scholarship');
+  if (!g.ok) return g;
+  if (input.id) {
+    const { error } = await g.supabase.from('scholarships')
+      .update({ sponsor: input.sponsor || null, stage: input.stage }).eq('id', input.id);
+    if (error) return { ok: false, error: error.message };
+  } else {
+    const { error } = await g.supabase.from('scholarships')
+      .insert({ student_id: input.studentId, sponsor: input.sponsor || null, stage: input.stage });
+    if (error) return { ok: false, error: error.message };
+  }
+  revalidatePath('/scholarship');
+  return { ok: true };
+}
+
+export interface RequirementInput {
+  studentId: string;
+  scholarshipId?: string | null;
+  title: string;
+  kind?: string;
+  dueDate?: string | null;
+}
+
+export async function addRequirement(input: RequirementInput): Promise<Result> {
+  if (!input.title.trim()) return { ok: false, error: 'Title is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_scholarship');
+  if (!g.ok) return g;
+  const scholarshipId = input.scholarshipId ?? (await ensureScholarship(g.supabase, input.studentId));
+  if (!scholarshipId) return { ok: false, error: 'Could not attach requirement.' };
+  const { error } = await g.supabase.from('scholarship_requirements').insert({
+    scholarship_id: scholarshipId,
+    title: input.title.trim(),
+    kind: input.kind || null,
+    due_date: input.dueDate || null,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/scholarship');
+  return { ok: true };
+}
+
+export async function updateRequirement(input: { id: string; title: string; kind?: string; dueDate?: string | null; completed?: boolean }): Promise<Result> {
+  if (!input.title.trim()) return { ok: false, error: 'Title is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_scholarship');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('scholarship_requirements').update({
+    title: input.title.trim(),
+    kind: input.kind || null,
+    due_date: input.dueDate || null,
+    ...(input.completed === undefined ? {} : { completed: input.completed }),
+  }).eq('id', input.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/scholarship');
+  return { ok: true };
+}
+
+export async function toggleRequirement(id: string, completed: boolean): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_scholarship');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('scholarship_requirements').update({ completed }).eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/scholarship');
+  return { ok: true };
+}
+
+export async function deleteRequirement(id: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_scholarship');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('scholarship_requirements').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/scholarship');
+  return { ok: true };
+}
+
+export interface FundingInput {
+  studentId: string;
+  label: string;
+  kind: string;
+  sponsor?: string;
+  status: string;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+export async function addFunding(input: FundingInput): Promise<Result> {
+  if (!input.label.trim()) return { ok: false, error: 'Label is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_scholarship');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('funding_sources').insert({
+    family_id: g.session.familyId,
+    student_id: input.studentId,
+    label: input.label.trim(),
+    kind: input.kind || 'other',
+    sponsor: input.sponsor || null,
+    status: input.status || 'active',
+    start_date: input.startDate || new Date().toISOString().slice(0, 10),
+    end_date: input.endDate || null,
+    created_by: g.userId,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/scholarship');
+  return { ok: true };
+}
+
+export async function updateFunding(input: FundingInput & { id: string }): Promise<Result> {
+  if (!input.label.trim()) return { ok: false, error: 'Label is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_scholarship');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('funding_sources').update({
+    label: input.label.trim(),
+    kind: input.kind || 'other',
+    sponsor: input.sponsor || null,
+    status: input.status || 'active',
+    start_date: input.startDate || undefined,
+    end_date: input.endDate || null,
+  }).eq('id', input.id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/scholarship');
+  return { ok: true };
+}
+
+export async function deleteFunding(id: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard('manage_scholarship');
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('funding_sources').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/scholarship');
+  return { ok: true };
+}

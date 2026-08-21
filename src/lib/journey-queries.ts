@@ -86,14 +86,14 @@ export async function getAccommodations(familyId: string): Promise<Accommodation
 // ── University ────────────────────────────────────────────────────────────
 export interface UniversityView {
   studentId: string; name: string; university: string; course: string; ref: string;
-  years: { label: string; studyYear: number | null; status: string }[];
+  years: { id: string; label: string; studyYear: number | null; status: string }[];
 }
 export async function getUniversityInfo(familyId: string): Promise<UniversityView[]> {
   const supabase = await createClient();
   if (!supabase) return [];
   const { data } = await supabase
     .from('student_profiles')
-    .select('id, course, student_ref, member:family_members!student_profiles_member_id_fkey(display_name), university:universities(name), years:academic_years(label, study_year, status)')
+    .select('id, course, student_ref, member:family_members!student_profiles_member_id_fkey(display_name), university:universities(name), years:academic_years(id, label, study_year, status)')
     .eq('family_id', familyId);
   return (data ?? []).map((s) => ({
     studentId: s.id,
@@ -101,17 +101,17 @@ export async function getUniversityInfo(familyId: string): Promise<UniversityVie
     university: one<{ name: string }>(s.university)?.name ?? '—',
     course: s.course ?? '—',
     ref: s.student_ref ?? '—',
-    years: (((s.years as { label: string; study_year: number | null; status: string }[]) ?? [])
+    years: (((s.years as { id: string; label: string; study_year: number | null; status: string }[]) ?? [])
       .sort((a, b) => (a.study_year ?? 0) - (b.study_year ?? 0))
-      .map((y) => ({ label: y.label, studyYear: y.study_year, status: y.status }))),
+      .map((y) => ({ id: y.id, label: y.label, studyYear: y.study_year, status: y.status }))),
   }));
 }
 
 // ── Scholarship ─────────────────────────────────────────────────────────────
 export interface ScholarshipView {
-  studentId: string; name: string; sponsor: string; stage: string;
-  requirements: { title: string; kind: string; due: string; done: boolean }[];
-  funding: { label: string; status: string; start: string; end: string }[];
+  studentId: string; scholarshipId: string | null; name: string; sponsor: string; stage: string;
+  requirements: { id: string; title: string; kind: string; dueDate: string | null; due: string; done: boolean }[];
+  funding: { id: string; label: string; kind: string; sponsor: string; status: string; startDate: string | null; endDate: string | null; start: string; end: string }[];
 }
 export async function getScholarshipInfo(familyId: string): Promise<ScholarshipView[]> {
   const supabase = await createClient();
@@ -124,17 +124,18 @@ export async function getScholarshipInfo(familyId: string): Promise<ScholarshipV
   const out: ScholarshipView[] = [];
   for (const s of students ?? []) {
     const [schRes, fundRes] = await Promise.all([
-      supabase.from('scholarships').select('sponsor, stage, requirements:scholarship_requirements(title, kind, due_date, completed)').eq('student_id', s.id).order('start_date', { ascending: false }).limit(1).maybeSingle(),
-      supabase.from('funding_sources').select('label, status, start_date, end_date').eq('student_id', s.id).order('start_date', { ascending: true }),
+      supabase.from('scholarships').select('id, sponsor, stage, requirements:scholarship_requirements(id, title, kind, due_date, completed)').eq('student_id', s.id).order('start_date', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('funding_sources').select('id, label, kind, sponsor, status, start_date, end_date').eq('student_id', s.id).order('start_date', { ascending: true }),
     ]);
-    const sch = schRes.data as { sponsor: string | null; stage: string; requirements: { title: string; kind: string | null; due_date: string | null; completed: boolean }[] } | null;
+    const sch = schRes.data as { id: string; sponsor: string | null; stage: string; requirements: { id: string; title: string; kind: string | null; due_date: string | null; completed: boolean }[] } | null;
     out.push({
       studentId: s.id,
+      scholarshipId: sch?.id ?? null,
       name: one<{ display_name: string }>(s.member)?.display_name ?? 'Student',
-      sponsor: sch?.sponsor ?? '—',
+      sponsor: sch?.sponsor ?? '',
       stage: sch?.stage ?? 'family_funded',
-      requirements: (sch?.requirements ?? []).map((r) => ({ title: r.title, kind: r.kind ?? '', due: fmtDate(r.due_date), done: r.completed })),
-      funding: ((fundRes.data as { label: string; status: string; start_date: string; end_date: string | null }[]) ?? []).map((f) => ({ label: f.label, status: f.status, start: fmtDate(f.start_date), end: f.end_date ? fmtDate(f.end_date) : 'present' })),
+      requirements: (sch?.requirements ?? []).map((r) => ({ id: r.id, title: r.title, kind: r.kind ?? '', dueDate: r.due_date, due: fmtDate(r.due_date), done: r.completed })),
+      funding: ((fundRes.data as { id: string; label: string; kind: string; sponsor: string | null; status: string; start_date: string; end_date: string | null }[]) ?? []).map((f) => ({ id: f.id, label: f.label, kind: f.kind, sponsor: f.sponsor ?? '', status: f.status, startDate: f.start_date, endDate: f.end_date, start: fmtDate(f.start_date), end: f.end_date ? fmtDate(f.end_date) : 'present' })),
     });
   }
   return out;
