@@ -56,6 +56,8 @@ export interface Message {
   body: string;
   createdAt: string;
   pinned?: boolean;
+  attachments?: { url: string | null; mime: string | null }[];
+  reactions?: { emoji: string; count: number; mine: boolean }[];
 }
 
 export interface Expense {

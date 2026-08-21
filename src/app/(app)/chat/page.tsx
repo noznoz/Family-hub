@@ -19,6 +19,7 @@ export default async function ChatPage() {
       <ChatView
         live={false}
         me={session.member.displayName}
+        familyId={session.familyId}
         conversationId="demo"
         conversations={[{ id: 'demo', title: 'Family Chat', kind: 'family' }]}
         pinned={demoPinned}
@@ -39,12 +40,13 @@ export default async function ChatPage() {
     );
   }
   const active = conversations[0]!;
-  const messages = await getMessages(active.id);
+  const messages = await getMessages(active.id, session.memberId);
 
   return (
     <ChatView
       live
       me={session.member.displayName}
+      familyId={session.familyId}
       conversationId={active.id}
       conversations={conversations}
       pinned={messages.filter((m) => m.pinned)}

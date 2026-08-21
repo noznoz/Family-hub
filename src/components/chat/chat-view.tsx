@@ -2,29 +2,26 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pin, Send, ListPlus, HandCoins, Smile } from 'lucide-react';
+import { Pin, Send, ListPlus, HandCoins, Smile, ImagePlus, Loader2 } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { Chip } from '@/components/ui/chip';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
-import { sendMessage } from '@/lib/actions/chat';
+import { uploadMedia } from '@/lib/storage';
+import { sendMessage, toggleReaction, convertMessageToTask, convertMessageToPayment } from '@/lib/actions/chat';
 import type { Message } from '@/lib/types';
 import type { Conversation } from '@/lib/chat-queries';
 
+const QUICK = ['👍', '❤️', '😂', '🎉', '🙏', '✅'];
+
 export function ChatView({
-  live,
-  me,
-  conversationId,
-  conversations,
-  pinned,
-  messages: initial,
-  canSend,
-  canConvert,
+  live, me, familyId, conversationId, conversations, pinned, messages: initial, canSend, canConvert,
 }: {
   live: boolean;
   me: string;
+  familyId: string;
   conversationId: string;
   conversations: Conversation[];
   pinned: Message[];
@@ -36,60 +33,71 @@ export function ChatView({
   const [messages, setMessages] = useState<Message[]>(initial);
   const [draft, setDraft] = useState('');
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
   const [, startTransition] = useTransition();
+  const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const title = conversations.find((c) => c.id === conversationId)?.title ?? 'Family Chat';
 
-  // Keep in sync with fresh server data (after router.refresh()).
   useEffect(() => setMessages(initial), [initial]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
 
-  // Scroll to newest.
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
-
-  // Realtime: refresh when a new message lands in this conversation.
   useEffect(() => {
     if (!live) return;
     const supabase = createClient();
     if (!supabase) return;
     const channel = supabase
       .channel(`messages:${conversationId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` },
-        () => router.refresh(),
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, () => router.refresh())
       .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [live, conversationId, router]);
 
-  const send = () => {
+  const send = async () => {
     const body = draft.trim();
-    if (!body) return;
+    if (!body && !file) return;
     setDraft('');
-    // optimistic
-    const optimistic: Message = {
-      id: `tmp-${Date.now()}`,
-      sender: me,
-      role: 'admin',
-      body,
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    setMessages((m) => [...m, optimistic]);
-    if (live) startTransition(async () => {
-      await sendMessage(conversationId, body);
+    if (!live) {
+      setMessages((m) => [...m, { id: `tmp-${Date.now()}`, sender: me, role: 'admin', body, createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+      setFile(null);
+      return;
+    }
+    setSending(true);
+    try {
+      const attachments = [] as { path: string; mime?: string; name?: string; size?: number }[];
+      if (file) {
+        const safe = file.name.replace(/[^\w.\-]+/g, '_');
+        const path = await uploadMedia(familyId, file, `chat/${conversationId}/${Date.now()}-${safe}`);
+        if (path) attachments.push({ path, mime: file.type, name: file.name, size: file.size });
+      }
+      await sendMessage(conversationId, body, attachments);
+      setFile(null);
       router.refresh();
-    });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const react = (id: string, emoji: string) => {
+    setMenuFor(null);
+    if (live) startTransition(async () => { await toggleReaction(id, emoji); router.refresh(); });
+  };
+  const toTask = (id: string) => {
+    setMenuFor(null);
+    if (live) startTransition(async () => { await convertMessageToTask(id); router.refresh(); });
+  };
+  const toPayment = (id: string) => {
+    setMenuFor(null);
+    const val = window.prompt('Amount to request (£):');
+    const amount = Number(val);
+    if (!amount || amount <= 0) return;
+    if (live) startTransition(async () => { await convertMessageToPayment(id, amount); router.refresh(); });
   };
 
   return (
     <div className="flex h-[calc(100dvh-8rem)] flex-col md:h-[calc(100dvh-10rem)]">
-      <div className="mb-3">
-        <h1 className="text-2xl font-extrabold tracking-tight text-navy">{title}</h1>
-      </div>
+      <div className="mb-3"><h1 className="text-2xl font-extrabold tracking-tight text-navy">{title}</h1></div>
 
       {pinned.length > 0 && (
         <div className="mb-3">
@@ -116,20 +124,47 @@ export function ChatView({
               <div className="max-w-[78%]">
                 <div className={cn('rounded-2xl px-3.5 py-2 text-sm', mine ? 'rounded-br-sm bg-navy text-white' : 'rounded-bl-sm bg-white text-navy shadow-card')}>
                   {!mine && <p className="mb-0.5 text-xs font-bold text-brand">{m.sender}</p>}
-                  <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                  {m.attachments?.filter((a) => a.url).map((a, i) => (
+                    a.mime?.startsWith('image/')
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img key={i} src={a.url!} alt="attachment" className="mb-1.5 max-h-60 rounded-xl object-cover" />
+                      : <a key={i} href={a.url!} target="_blank" rel="noopener noreferrer" className={cn('mb-1 block underline', mine ? 'text-white' : 'text-brand')}>Attachment</a>
+                  ))}
+                  {m.body && <p className="whitespace-pre-wrap break-words">{m.body}</p>}
                 </div>
+
+                {/* Reactions */}
+                {(m.reactions?.length ?? 0) > 0 && (
+                  <div className={cn('mt-1 flex flex-wrap gap-1', mine && 'justify-end')}>
+                    {m.reactions!.map((r) => (
+                      <button key={r.emoji} onClick={() => react(m.id, r.emoji)}
+                        className={cn('rounded-full border px-2 py-0.5 text-xs', r.mine ? 'border-brand bg-brand-muted' : 'border-border bg-white')}>
+                        {r.emoji} {r.count}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className={cn('mt-0.5 flex items-center gap-2 px-1', mine && 'justify-end')}>
                   <span className="text-[10px] text-muted-foreground">{m.createdAt}</span>
-                  {canConvert && (
+                  {live && (
                     <button onClick={() => setMenuFor(menuFor === m.id ? null : m.id)} className="text-muted-foreground hover:text-navy" aria-label="Message actions">
                       <Smile className="size-3.5" />
                     </button>
                   )}
                 </div>
-                {menuFor === m.id && canConvert && (
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    <Chip tone="brand"><ListPlus className="size-3.5" /> To Task</Chip>
-                    <Chip tone="brand"><HandCoins className="size-3.5" /> To Payment</Chip>
+
+                {menuFor === m.id && (
+                  <div className={cn('mt-1 flex flex-wrap items-center gap-1.5', mine && 'justify-end')}>
+                    {QUICK.map((e) => (
+                      <button key={e} onClick={() => react(m.id, e)} className="rounded-full border border-border bg-white px-2 py-1 text-sm hover:bg-muted">{e}</button>
+                    ))}
+                    {canConvert && (
+                      <>
+                        <button onClick={() => toTask(m.id)}><Chip tone="brand"><ListPlus className="size-3.5" /> Task</Chip></button>
+                        <button onClick={() => toPayment(m.id)}><Chip tone="brand"><HandCoins className="size-3.5" /> Payment</Chip></button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -140,17 +175,27 @@ export function ChatView({
       </div>
 
       {canSend ? (
-        <div className="mt-3 flex items-center gap-2">
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && send()}
-            placeholder="Message the family…"
-            className="h-12 flex-1 rounded-full border border-input bg-white px-4 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          <Button size="icon" variant="brand" onClick={send} aria-label="Send" className="size-12 rounded-full">
-            <Send className="size-5" />
-          </Button>
+        <div className="mt-3">
+          {file && (
+            <div className="mb-2 flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-sm text-navy">
+              <ImagePlus className="size-4 text-navy-400" />
+              <span className="flex-1 truncate">{file.name}</span>
+              <button onClick={() => setFile(null)} className="text-danger">Remove</button>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <button type="button" onClick={() => fileRef.current?.click()} aria-label="Attach photo"
+              className="flex size-12 shrink-0 items-center justify-center rounded-full border border-input bg-white text-navy-400 hover:text-navy">
+              <ImagePlus className="size-5" />
+            </button>
+            <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()}
+              placeholder="Message the family…"
+              className="h-12 flex-1 rounded-full border border-input bg-white px-4 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+            <Button size="icon" variant="brand" onClick={send} disabled={sending} aria-label="Send" className="size-12 rounded-full">
+              {sending ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
+            </Button>
+          </div>
         </div>
       ) : (
         <p className="mt-3 rounded-xl bg-muted p-3 text-center text-sm text-muted-foreground">
