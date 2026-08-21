@@ -35,7 +35,7 @@ export async function getFamilyMembers(familyId: string): Promise<Member[]> {
   if (!supabase) return [];
   const { data } = await supabase
     .from('family_members')
-    .select('id, display_name, role, is_student, status, relationships:family_relationships!family_relationships_member_id_fkey(relationship)')
+    .select('id, display_name, role, is_student, status, invite_email, profile_id, relationships:family_relationships!family_relationships_member_id_fkey(relationship)')
     .eq('family_id', familyId)
     .neq('status', 'disabled')
     .order('created_at', { ascending: true });
@@ -45,6 +45,9 @@ export async function getFamilyMembers(familyId: string): Promise<Member[]> {
     displayName: m.display_name,
     role: m.role as SystemRole,
     isStudent: m.is_student,
+    status: m.status,
+    inviteEmail: (m as { invite_email?: string | null }).invite_email ?? null,
+    linked: !!(m as { profile_id?: string | null }).profile_id,
     relationship:
       (m.relationships as { relationship: string }[] | null)?.[0]?.relationship?.replace(/_/g, ' ') ??
       (m.is_student ? 'Son' : 'Family'),

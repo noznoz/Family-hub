@@ -58,6 +58,26 @@ async function ensureMembershipInner(): Promise<OnboardResult> {
     .maybeSingle();
   if (existing) return existing.status === 'active' ? 'active' : 'pending';
 
+  // Link to a pre-invited slot whose email matches this user (any family).
+  // This is how an admin onboards others: set a member's login email, they sign
+  // up with it, and they land straight into that member (with its role).
+  if (user.email) {
+    const { data: invited } = await admin
+      .from('family_members')
+      .select('id')
+      .is('profile_id', null)
+      .ilike('invite_email', user.email)
+      .limit(1)
+      .maybeSingle();
+    if (invited) {
+      const { error } = await admin
+        .from('family_members')
+        .update({ profile_id: user.id, status: 'active' })
+        .eq('id', invited.id);
+      if (!error) return 'active';
+    }
+  }
+
   // Is there already an active, linked admin? If not, this user bootstraps as admin.
   const { data: admins } = await admin
     .from('family_members')

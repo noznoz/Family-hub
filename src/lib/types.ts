@@ -14,6 +14,9 @@ export interface Member {
   isStudent: boolean;
   avatarUrl?: string | null;
   relationship?: string;
+  inviteEmail?: string | null;
+  status?: string;
+  linked?: boolean;
 }
 
 export interface StudentSummary {

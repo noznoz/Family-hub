@@ -110,3 +110,18 @@ export async function setMemberStatus(memberId: string, status: 'active' | 'disa
   revalidatePath('/family');
   return { ok: true };
 }
+
+export async function setMemberEmail(memberId: string, email: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const guard = await requireManage();
+  if (!guard.ok) return guard;
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+  const clean = email.trim().toLowerCase();
+  if (clean && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) return { ok: false, error: 'Enter a valid email.' };
+  const { error } = await supabase.from('family_members').update({ invite_email: clean || null }).eq('id', memberId);
+  if (error) return { ok: false, error: error.message };
+  await audit(guard.familyId, guard.actorId, 'member.set_email', memberId, {});
+  revalidatePath('/family');
+  return { ok: true };
+}
