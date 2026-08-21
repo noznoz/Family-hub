@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
 import { ReminderButton } from '@/components/ui/reminder-button';
+import { ShareButton } from '@/components/ui/share-button';
 import { AccommodationFormDialog } from './accommodation-form-dialog';
 import { deleteAccommodation } from '@/lib/actions/journey';
 import type { AccommodationView as AccView } from '@/lib/journey-queries';
@@ -40,6 +41,7 @@ export function AccommodationView({
               <p className="font-bold text-navy">{a.property}</p>
               <div className="flex items-center gap-1">
                 {a.current ? <Chip tone="success">Current</Chip> : <Chip tone="neutral">Past</Chip>}
+                <ShareButton text={`🏠 ${a.property}${a.address ? `\n${a.address}` : ''}\n💷 ${a.rent}${a.student ? ` · ${a.student}` : ''}\n${a.start} → ${a.end}`} url="/accommodation" />
                 <ReminderButton entityType="accommodation" entityId={a.id} title={a.property} link="/accommodation" live={live} meId={meId} />
                 {canManage && (
                   <>

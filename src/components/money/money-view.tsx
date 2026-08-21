@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
 import { ReminderButton } from '@/components/ui/reminder-button';
+import { ShareButton } from '@/components/ui/share-button';
 import { formatMoney, cn } from '@/lib/utils';
 import {
   decidePaymentRequest, markPaid, deleteExpense, deletePaymentRequest,
@@ -118,6 +119,7 @@ export function MoneyView({
                 </div>
                 <span className="shrink-0 font-bold text-navy">{formatMoney(e.amount, e.currency)}</span>
                 <div className="flex shrink-0 items-center">
+                  <ShareButton text={`💷 Expense: ${e.description || e.category} — ${formatMoney(e.amount, e.currency)} (${e.category}, ${e.student})`} url="/money" />
                   <ReminderButton entityType="expense" entityId={e.id} title={e.description || e.category} link="/money" live={live} meId={meId} />
                 </div>
                 {canManage && (
@@ -164,6 +166,7 @@ export function MoneyView({
                   <Chip tone="neutral">{r.category}</Chip>
                   <span className="text-xs text-muted-foreground">by {r.requestedBy}</span>
                   <span className="ml-auto flex items-center">
+                    <ShareButton text={`💷 Payment request: ${r.reason} — ${formatMoney(r.amount, r.currency)} (${r.category}, ${r.student}) · by ${r.requestedBy}`} url="/money" />
                     <ReminderButton entityType="payment_request" entityId={r.id} title={r.reason} link="/money" live={live} meId={meId} />
                   </span>
                   {r.status === 'requested' && (canApprove || isStudent) && (

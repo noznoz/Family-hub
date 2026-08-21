@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
 import { ReminderButton } from '@/components/ui/reminder-button';
+import { ShareButton } from '@/components/ui/share-button';
 import { EventFormDialog } from './event-form-dialog';
 import { deleteCalendarEvent } from '@/lib/actions/journey';
 import type { CalEvent } from '@/lib/journey-queries';
@@ -53,6 +54,7 @@ export function CalendarView({
                 </div>
               </div>
               <div className="flex shrink-0 items-center">
+                <ShareButton text={`📅 ${e.title}\n${e.whenRaw}${e.student ? ` · ${e.student}` : ''}`} url="/calendar" />
                 <ReminderButton entityType="calendar_event" entityId={e.id} title={e.title} link="/calendar" live={live} meId={meId} />
                 {canManage ? (
                   <>

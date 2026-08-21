@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
 import { ReminderButton } from '@/components/ui/reminder-button';
+import { ShareButton } from '@/components/ui/share-button';
 import { cn } from '@/lib/utils';
 import { setTaskStatus, deleteTask } from '@/lib/actions/tasks';
 import { TaskCreateDialog } from './task-create-dialog';
@@ -129,6 +130,10 @@ export function TasksView({
                 </div>
               </div>
               <div className="flex shrink-0 items-center">
+                <ShareButton
+                  text={`📋 Task: ${t.title}${t.description ? `\n${t.description}` : ''}${t.due ? `\n🗓 Due: ${t.due}` : ''}${t.assignee ? `\n👤 ${t.assignee}` : ''}`}
+                  url="/tasks"
+                />
                 <ReminderButton
                   entityType="task"
                   entityId={t.id}

@@ -1,7 +1,7 @@
 import {
   Home, MessageCircle, ListChecks, Wallet, LayoutGrid,
   Plane, FileText, LifeBuoy, Users, Building2, GraduationCap,
-  Award, Calendar, Settings, type LucideIcon,
+  Award, Calendar, Settings, UserRound, type LucideIcon,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -21,6 +21,7 @@ export const primaryNav: NavItem[] = [
 
 /** Secondary destinations under "More" — Support kept near the top. */
 export const moreNav: NavItem[] = [
+  { href: '/profile', label: 'My profile', icon: UserRound },
   { href: '/support', label: 'Support', icon: LifeBuoy },
   { href: '/travel', label: 'Travel', icon: Plane },
   { href: '/documents', label: 'Documents', icon: FileText },

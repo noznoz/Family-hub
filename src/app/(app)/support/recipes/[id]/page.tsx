@@ -10,6 +10,22 @@ import { Chip } from '@/components/ui/chip';
 import { VoiceRecorder } from '@/components/support/voice-recorder';
 import { RecipeHeaderActions } from '@/components/support/recipe-header-actions';
 import { RecipeCoverButton, RecipePhotos } from '@/components/support/recipe-photos';
+import { ShareButton } from '@/components/ui/share-button';
+import type { RecipeDetail } from '@/lib/support-queries';
+
+function recipeShareText(r: RecipeDetail): string {
+  const meta = [
+    r.prep != null ? `Prep ${r.prep}m` : '',
+    r.cook != null ? `Cook ${r.cook}m` : '',
+    r.servings != null ? `Serves ${r.servings}` : '',
+  ].filter(Boolean).join(' · ');
+  const parts = [`🍽 ${r.name}`];
+  if (r.description) parts.push(r.description);
+  if (meta) parts.push(meta);
+  if (r.ingredients.length) parts.push('\n🧾 Ingredients:\n' + r.ingredients.map((i) => `• ${i}`).join('\n'));
+  if (r.steps.length) parts.push('\n👩‍🍳 Method:\n' + r.steps.map((s) => `${s.no}. ${s.body}`).join('\n'));
+  return parts.join('\n');
+}
 
 export const metadata: Metadata = { title: 'Recipe' };
 
@@ -42,7 +58,10 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
         <div className="p-5">
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-2xl font-extrabold tracking-tight text-navy">{recipe.name}</h1>
-            {canEdit && <RecipeHeaderActions recipe={recipe} live={!session.isDemo} />}
+            <div className="flex items-center gap-1">
+              <ShareButton text={recipeShareText(recipe)} url={`/support/recipes/${recipe.id}`} />
+              {canEdit && <RecipeHeaderActions recipe={recipe} live={!session.isDemo} />}
+            </div>
           </div>
           {recipe.description && <p className="mt-1 text-sm text-muted-foreground">{recipe.description}</p>}
           <div className="mt-3 flex flex-wrap gap-1.5">

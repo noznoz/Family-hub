@@ -17,7 +17,7 @@ export function AppHeader({ name }: { name: string }) {
           <Bell className="size-5 text-navy" />
           <span className="absolute right-1 top-1 size-2 rounded-full bg-danger" />
         </Link>
-        <Link href="/settings" aria-label="Profile">
+        <Link href="/profile" aria-label="Profile">
           <Avatar name={name} size="sm" />
         </Link>
       </div>

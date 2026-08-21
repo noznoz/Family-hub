@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
 import { ReminderButton } from '@/components/ui/reminder-button';
+import { ShareButton } from '@/components/ui/share-button';
 import { TripFormDialog } from './trip-form-dialog';
 import { deleteTrip } from '@/lib/actions/journey';
 import { useRouter } from 'next/navigation';
@@ -45,6 +46,7 @@ export function TravelView({
             <div className="flex shrink-0 flex-col items-end gap-1">
               <Chip tone={tone}>{t.departLabel}</Chip>
               <div className="flex items-center">
+                <ShareButton text={`✈️ Trip: ${t.title}\n${t.origin || '—'} → ${t.destination || '—'}\n🗓 ${t.departLabel}${t.travelers.length ? `\n👥 ${t.travelers.join(', ')}` : ''}`} url="/travel" />
                 <ReminderButton entityType="trip" entityId={t.id} title={t.title} link="/travel" live={live} meId={meId} members={members} />
                 {canManage && (
                   <>
