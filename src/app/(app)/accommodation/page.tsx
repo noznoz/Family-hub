@@ -15,5 +15,5 @@ export default async function AccommodationPage() {
     ? [[], []]
     : await Promise.all([getAccommodations(session.familyId), getStudentOptions(session.familyId)]);
 
-  return <AccommodationView list={list} students={students} live={!session.isDemo} canManage={canManage} />;
+  return <AccommodationView list={list} students={students} live={!session.isDemo} canManage={canManage} meId={session.memberId} />;
 }

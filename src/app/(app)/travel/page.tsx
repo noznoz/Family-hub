@@ -18,5 +18,5 @@ export default async function TravelPage() {
         getFamilyMembers(session.familyId).then((ms) => ms.map((m) => ({ id: m.id, name: m.displayName }))),
       ]);
 
-  return <TravelView trips={trips} members={members} live={!session.isDemo} canManage={canManage} />;
+  return <TravelView trips={trips} members={members} live={!session.isDemo} canManage={canManage} meId={session.memberId} />;
 }

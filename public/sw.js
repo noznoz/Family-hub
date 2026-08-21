@@ -1,5 +1,5 @@
 /* Family Hub service worker — app-shell caching with a safe hybrid strategy. */
-const VERSION = 'family-hub-v2';
+const VERSION = 'family-hub-v3';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -87,6 +87,11 @@ self.addEventListener('push', (event) => {
       body: data.body || '',
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
+      // Default OS tone plays automatically (not silent); vibrate for an alarm feel.
+      vibrate: [200, 100, 200],
+      requireInteraction: !!data.requireInteraction,
+      tag: data.tag || undefined,
+      renotify: !!data.tag,
       data: { url: data.url || '/home' },
     }),
   );

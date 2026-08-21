@@ -7,6 +7,7 @@ import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
+import { ReminderButton } from '@/components/ui/reminder-button';
 import { cn } from '@/lib/utils';
 import { setTaskStatus, deleteTask } from '@/lib/actions/tasks';
 import { TaskCreateDialog } from './task-create-dialog';
@@ -25,11 +26,13 @@ const statusLabel: Record<TaskStatus, string> = { todo: 'To Do', in_progress: 'I
 export function TasksView({
   tasks: initial,
   live,
+  meId,
   students,
   members,
 }: {
   tasks: Task[];
   live: boolean;
+  meId: string;
   students: { id: string; name: string }[];
   members: { id: string; name: string }[];
 }) {
@@ -126,6 +129,15 @@ export function TasksView({
                 </div>
               </div>
               <div className="flex shrink-0 items-center">
+                <ReminderButton
+                  entityType="task"
+                  entityId={t.id}
+                  title={t.title}
+                  link="/tasks"
+                  live={live}
+                  meId={meId}
+                  members={members}
+                />
                 <TaskCreateDialog
                   live={live}
                   students={students}

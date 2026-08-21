@@ -6,18 +6,20 @@ import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
+import { ReminderButton } from '@/components/ui/reminder-button';
 import { TripFormDialog } from './trip-form-dialog';
 import { deleteTrip } from '@/lib/actions/journey';
 import { useRouter } from 'next/navigation';
 import type { TripView } from '@/lib/journey-queries';
 
 export function TravelView({
-  trips, members, live, canManage,
+  trips, members, live, canManage, meId,
 }: {
   trips: TripView[];
   members: { id: string; name: string }[];
   live: boolean;
   canManage: boolean;
+  meId: string;
 }) {
   const router = useRouter();
   const upcoming = trips.filter((t) => t.upcoming);
@@ -42,16 +44,19 @@ export function TravelView({
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <Chip tone={tone}>{t.departLabel}</Chip>
-              {canManage && (
-                <div className="flex items-center">
-                  <TripFormDialog
-                    live={live} members={members} trip={t}
-                    trigger={<button type="button" aria-label="Edit trip" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>}
-                  />
-                  <DeleteButton itemLabel={`“${t.title}”`} title="Delete trip"
-                    onConfirm={() => (live ? deleteTrip(t.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
-                </div>
-              )}
+              <div className="flex items-center">
+                <ReminderButton entityType="trip" entityId={t.id} title={t.title} link="/travel" live={live} meId={meId} members={members} />
+                {canManage && (
+                  <>
+                    <TripFormDialog
+                      live={live} members={members} trip={t}
+                      trigger={<button type="button" aria-label="Edit trip" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>}
+                    />
+                    <DeleteButton itemLabel={`“${t.title}”`} title="Delete trip"
+                      onConfirm={() => (live ? deleteTrip(t.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </Card>

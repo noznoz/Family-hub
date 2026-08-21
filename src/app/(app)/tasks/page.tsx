@@ -22,6 +22,7 @@ export default async function TasksPage() {
     <TasksView
       tasks={tasks}
       live={!session.isDemo}
+      meId={session.memberId}
       students={students.map((s) => ({ id: s.id, name: s.name }))}
       members={members.map((m) => ({ id: m.id, name: m.displayName }))}
     />

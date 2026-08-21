@@ -14,5 +14,5 @@ export default async function CalendarPage() {
     ? [[], []]
     : await Promise.all([getCalendar(session.familyId), getStudentOptions(session.familyId)]);
 
-  return <CalendarView events={events} students={students} live={!session.isDemo} canManage={canManage} />;
+  return <CalendarView events={events} students={students} live={!session.isDemo} canManage={canManage} meId={session.memberId} />;
 }

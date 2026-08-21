@@ -8,6 +8,7 @@ import { Chip } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DocumentUploadDialog } from '@/components/documents/document-upload-dialog';
 import { DocumentRowActions } from '@/components/documents/document-row-actions';
+import { ReminderButton } from '@/components/ui/reminder-button';
 
 export const metadata: Metadata = { title: 'Documents' };
 
@@ -60,6 +61,7 @@ export default async function DocumentsPage() {
                 <a href={d.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${d.name}`}
                   className="shrink-0 rounded-lg p-2 text-brand hover:bg-muted"><ExternalLink className="size-5" /></a>
               )}
+              <ReminderButton entityType="document" entityId={d.id} title={d.name} link="/documents" live={!session.isDemo} meId={session.memberId} />
               {canManage && <DocumentRowActions doc={d} students={students} live={!session.isDemo} />}
             </div>
           ))}

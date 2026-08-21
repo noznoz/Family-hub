@@ -7,6 +7,7 @@ import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
+import { ReminderButton } from '@/components/ui/reminder-button';
 import { EventFormDialog } from './event-form-dialog';
 import { deleteCalendarEvent } from '@/lib/actions/journey';
 import type { CalEvent } from '@/lib/journey-queries';
@@ -16,12 +17,13 @@ const kindTone: Record<string, 'brand' | 'attention' | 'danger' | 'success' | 'n
 };
 
 export function CalendarView({
-  events, students, live, canManage,
+  events, students, live, canManage, meId,
 }: {
   events: CalEvent[];
   students: { id: string; name: string }[];
   live: boolean;
   canManage: boolean;
+  meId: string;
 }) {
   const router = useRouter();
   return (
@@ -50,16 +52,19 @@ export function CalendarView({
                   <span className="text-xs text-muted-foreground">{e.whenRaw}</span>
                 </div>
               </div>
-              {canManage ? (
-                <div className="flex shrink-0 items-center">
-                  <EventFormDialog live={live} students={students} event={e}
-                    trigger={<button type="button" aria-label="Edit event" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>} />
-                  <DeleteButton itemLabel={`“${e.title}”`} title="Delete event"
-                    onConfirm={() => (live ? deleteCalendarEvent(e.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
-                </div>
-              ) : (
-                <span className="shrink-0 text-xs font-semibold text-muted-foreground">{e.when}</span>
-              )}
+              <div className="flex shrink-0 items-center">
+                <ReminderButton entityType="calendar_event" entityId={e.id} title={e.title} link="/calendar" live={live} meId={meId} />
+                {canManage ? (
+                  <>
+                    <EventFormDialog live={live} students={students} event={e}
+                      trigger={<button type="button" aria-label="Edit event" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>} />
+                    <DeleteButton itemLabel={`“${e.title}”`} title="Delete event"
+                      onConfirm={() => (live ? deleteCalendarEvent(e.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
+                  </>
+                ) : (
+                  <span className="ml-1 text-xs font-semibold text-muted-foreground">{e.when}</span>
+                )}
+              </div>
             </div>
           ))}
         </Card>

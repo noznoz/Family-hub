@@ -46,6 +46,7 @@ export default async function MoneyPage() {
   return (
     <MoneyView
       live={!session.isDemo}
+      meId={session.memberId}
       budgets={demoBudgets}
       expenses={expenses}
       requests={requests}

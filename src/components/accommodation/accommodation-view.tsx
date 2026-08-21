@@ -7,17 +7,19 @@ import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
+import { ReminderButton } from '@/components/ui/reminder-button';
 import { AccommodationFormDialog } from './accommodation-form-dialog';
 import { deleteAccommodation } from '@/lib/actions/journey';
 import type { AccommodationView as AccView } from '@/lib/journey-queries';
 
 export function AccommodationView({
-  list, students, live, canManage,
+  list, students, live, canManage, meId,
 }: {
   list: AccView[];
   students: { id: string; name: string }[];
   live: boolean;
   canManage: boolean;
+  meId: string;
 }) {
   const router = useRouter();
   return (
@@ -38,6 +40,7 @@ export function AccommodationView({
               <p className="font-bold text-navy">{a.property}</p>
               <div className="flex items-center gap-1">
                 {a.current ? <Chip tone="success">Current</Chip> : <Chip tone="neutral">Past</Chip>}
+                <ReminderButton entityType="accommodation" entityId={a.id} title={a.property} link="/accommodation" live={live} meId={meId} />
                 {canManage && (
                   <>
                     <AccommodationFormDialog live={live} students={students} item={a}

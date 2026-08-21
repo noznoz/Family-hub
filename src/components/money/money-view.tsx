@@ -8,6 +8,7 @@ import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
+import { ReminderButton } from '@/components/ui/reminder-button';
 import { formatMoney, cn } from '@/lib/utils';
 import {
   decidePaymentRequest, markPaid, deleteExpense, deletePaymentRequest,
@@ -20,9 +21,10 @@ const TABS = ['Overview', 'Expenses', 'Requests'] as const;
 type Tab = (typeof TABS)[number];
 
 export function MoneyView({
-  live, budgets, expenses, requests, students, onlyStudent, canManage, canApprove, isStudent,
+  live, meId, budgets, expenses, requests, students, onlyStudent, canManage, canApprove, isStudent,
 }: {
   live: boolean;
+  meId: string;
   budgets: Budgets;
   expenses: Expense[];
   requests: PaymentRequest[];
@@ -115,6 +117,9 @@ export function MoneyView({
                   </div>
                 </div>
                 <span className="shrink-0 font-bold text-navy">{formatMoney(e.amount, e.currency)}</span>
+                <div className="flex shrink-0 items-center">
+                  <ReminderButton entityType="expense" entityId={e.id} title={e.description || e.category} link="/money" live={live} meId={meId} />
+                </div>
                 {canManage && (
                   <div className="flex shrink-0 items-center">
                     <MoneyFormDialog
@@ -158,8 +163,11 @@ export function MoneyView({
                   <Chip tone="navy">{r.student}</Chip>
                   <Chip tone="neutral">{r.category}</Chip>
                   <span className="text-xs text-muted-foreground">by {r.requestedBy}</span>
+                  <span className="ml-auto flex items-center">
+                    <ReminderButton entityType="payment_request" entityId={r.id} title={r.reason} link="/money" live={live} meId={meId} />
+                  </span>
                   {r.status === 'requested' && (canApprove || isStudent) && (
-                    <span className="ml-auto flex items-center">
+                    <span className="flex items-center">
                       <MoneyFormDialog
                         live={live} students={students} mode="request" editRequest={r}
                         trigger={

@@ -23,7 +23,7 @@ export async function getVapidPublicKey(): Promise<string | null> {
   return v?.publicKey ?? null;
 }
 
-export interface PushPayload { title: string; body: string; url?: string }
+export interface PushPayload { title: string; body: string; url?: string; requireInteraction?: boolean; tag?: string }
 
 /** Send a push to every device a member has subscribed. Prunes dead subs. */
 export async function sendPushToMember(memberId: string, payload: PushPayload): Promise<void> {
@@ -37,7 +37,10 @@ export async function sendPushToMember(memberId: string, payload: PushPayload): 
     .eq('member_id', memberId);
   if (!subs?.length) return;
 
-  const body = JSON.stringify({ title: payload.title, body: payload.body, url: payload.url ?? '/home' });
+  const body = JSON.stringify({
+    title: payload.title, body: payload.body, url: payload.url ?? '/home',
+    requireInteraction: payload.requireInteraction ?? false, tag: payload.tag,
+  });
   await Promise.all(subs.map(async (s) => {
     try {
       await webpush.sendNotification(

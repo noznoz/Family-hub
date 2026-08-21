@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getSessionUser } from '@/lib/session';
 import { isSupabaseConfigured } from '@/lib/env';
 import type { TaskPriority, TaskStatus } from '@/lib/types';
-import { sendPushToMember } from '@/lib/push';
+import { notifyMembers } from '@/lib/notify';
 
 export interface CreateTaskInput {
   title: string;
@@ -44,8 +44,19 @@ export async function createTask(input: CreateTaskInput): Promise<Result> {
   });
   if (error) return { ok: false, error: error.message };
 
-  if (input.assigneeId) {
-    try { await sendPushToMember(input.assigneeId, { title: 'New task', body: input.title.trim(), url: '/tasks' }); } catch {}
+  // Notify the assignee across every channel (in-app + push + email), unless
+  // they assigned the task to themselves.
+  if (input.assigneeId && input.assigneeId !== session.memberId) {
+    try {
+      await notifyMembers({
+        familyId: session.familyId,
+        memberIds: [input.assigneeId],
+        title: 'New task assigned to you',
+        body: `${session.member.displayName} assigned you: ${input.title.trim()}`,
+        url: '/tasks',
+        kind: 'family_update',
+      });
+    } catch {}
   }
 
   revalidatePath('/tasks');
@@ -61,8 +72,12 @@ export interface UpdateTaskInput extends CreateTaskInput {
 export async function updateTask(input: UpdateTaskInput): Promise<Result> {
   if (!input.title.trim()) return { ok: false, error: 'Title is required.' };
   if (!isSupabaseConfigured) return { ok: true };
+  const session = await getSessionUser();
   const supabase = await createClient();
   if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+
+  // Note the current assignee so we only notify on an actual (re)assignment.
+  const { data: prev } = await supabase.from('tasks').select('assignee_id').eq('id', input.id).maybeSingle();
 
   const { error } = await supabase
     .from('tasks')
@@ -76,6 +91,23 @@ export async function updateTask(input: UpdateTaskInput): Promise<Result> {
     })
     .eq('id', input.id);
   if (error) return { ok: false, error: error.message };
+
+  if (
+    session && input.assigneeId &&
+    input.assigneeId !== prev?.assignee_id &&
+    input.assigneeId !== session.memberId
+  ) {
+    try {
+      await notifyMembers({
+        familyId: session.familyId,
+        memberIds: [input.assigneeId],
+        title: 'A task was assigned to you',
+        body: `${session.member.displayName} assigned you: ${input.title.trim()}`,
+        url: '/tasks',
+        kind: 'family_update',
+      });
+    } catch {}
+  }
 
   revalidatePath('/tasks');
   revalidatePath('/home');
