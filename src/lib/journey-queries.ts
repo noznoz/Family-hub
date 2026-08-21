@@ -176,6 +176,46 @@ function toLocalInput(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// ── Reminders ────────────────────────────────────────────────────────────────
+export interface UpcomingReminder {
+  id: string; title: string; when: string; link: string;
+  recipients: string[]; mine: boolean;
+}
+export async function getUpcomingReminders(familyId: string, memberId: string): Promise<UpcomingReminder[]> {
+  const supabase = await createClient();
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from('reminders')
+    .select('id, title, link, remind_at, recipient_ids, created_by')
+    .eq('family_id', familyId)
+    .eq('status', 'pending')
+    .order('remind_at', { ascending: true })
+    .limit(50);
+
+  const rows = (data ?? []).filter((r) => {
+    const rec = (r.recipient_ids as string[] | null) ?? [];
+    return r.created_by === memberId || rec.includes(memberId);
+  });
+  if (rows.length === 0) return [];
+
+  // Resolve recipient names for display.
+  const ids = [...new Set(rows.flatMap((r) => ((r.recipient_ids as string[] | null) ?? [])))];
+  const nameById = new Map<string, string>();
+  if (ids.length) {
+    const { data: members } = await supabase.from('family_members').select('id, display_name').in('id', ids);
+    for (const m of members ?? []) nameById.set(m.id, m.display_name);
+  }
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    link: r.link ?? '/home',
+    when: new Date(r.remind_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
+    recipients: ((r.recipient_ids as string[] | null) ?? []).map((id) => nameById.get(id) ?? '').filter(Boolean),
+    mine: r.created_by === memberId,
+  }));
+}
+
 // ── Notifications ────────────────────────────────────────────────────────────
 export interface NotificationView { id: string; kind: string; title: string; body: string; when: string; unread: boolean }
 export async function getNotifications(memberId: string): Promise<NotificationView[]> {
