@@ -15,6 +15,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { ShareButton } from '@/components/ui/share-button';
 import { SecretValue } from '@/components/students/secret-value';
 import { StudentPrivateDialog } from '@/components/students/student-private-dialog';
+import { AcademicEditDialog } from '@/components/students/academic-edit-dialog';
 import { MilestonesManager } from '@/components/students/milestones-manager';
 
 export const metadata: Metadata = { title: 'Student' };
@@ -37,6 +38,9 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
   const priv = canPrivate ? await getStudentPrivate(id) : null;
 
   const currentStage = student.overallStatus === 'Graduated' ? 5 : 2;
+  const canEditAcademics = !session.isDemo && (
+    session.member.role === 'admin' || session.member.role === 'parent' || session.memberId === detail?.memberId
+  );
   const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: detail?.currency ?? 'GBP', maximumFractionDigits: 0 });
 
   const shareText = [
@@ -120,7 +124,27 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
 
       {/* ── University ───────────────────────────────────────── */}
       {detail && (
-        <Section title="University">
+        <Section
+          title="University"
+          action={canEditAcademics && (
+            <AcademicEditDialog
+              studentId={id}
+              name={student.name}
+              live={!session.isDemo}
+              values={{
+                universityName: detail.university === '—' ? '' : detail.university,
+                universityCity: detail.universityCity ?? '',
+                universityWebsite: detail.universityWebsite ?? '',
+                course: detail.course ?? '',
+                studentRef: detail.studentRef ?? '',
+                campus: detail.campus ?? '',
+                advisor: detail.advisor ?? '',
+                startDate: detail.startDateISO ?? '',
+                expectedGraduation: detail.expectedGraduationISO ?? '',
+              }}
+            />
+          )}
+        >
           <Card className="divide-y divide-border">
             <Row icon={<GraduationCap className="size-5" />} label="Course" value={detail.course ?? '—'} />
             <Row icon={<IdCard className="size-5" />} label="Student ID" value={detail.studentRef ?? '—'} />

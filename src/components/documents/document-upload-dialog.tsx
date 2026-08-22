@@ -14,16 +14,24 @@ const CATEGORIES = ['passport', 'visa', 'university', 'scholarship', 'accommodat
 const VISIBILITY = [
   { v: 'parents_admins', label: 'Parents & admins' },
   { v: 'private_student', label: 'Private to student' },
+  { v: 'selected_members', label: 'Selected members' },
   { v: 'entire_family', label: 'Entire family' },
 ];
 const MAX_MB = 15;
 
-export function DocumentUploadDialog({ familyId, students }: { familyId: string; students: { id: string; name: string }[] }) {
+export function DocumentUploadDialog({
+  familyId, students, members = [],
+}: {
+  familyId: string;
+  students: { id: string; name: string }[];
+  members?: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [visibility, setVisibility] = useState('parents_admins');
 
   const onSubmit = (formData: FormData) => {
     if (!file) return setError('Choose a file to upload.');
@@ -31,9 +39,12 @@ export function DocumentUploadDialog({ familyId, students }: { familyId: string;
     const name = String(formData.get('name') ?? '').trim() || file.name;
     const category = String(formData.get('category') ?? 'other');
     const studentId = String(formData.get('studentId') ?? '') || null;
-    const visibility = String(formData.get('visibility') ?? 'parents_admins');
+    const vis = String(formData.get('visibility') ?? 'parents_admins');
     const expiry = String(formData.get('expiry') ?? '') || null;
     const notes = String(formData.get('notes') ?? '');
+    const shareMemberIds = vis === 'selected_members'
+      ? members.map((m) => m.id).filter((id) => formData.get(`s_${id}`) === 'on')
+      : [];
     setError(null);
 
     startTransition(async () => {
@@ -41,7 +52,7 @@ export function DocumentUploadDialog({ familyId, students }: { familyId: string;
       const path = await uploadDocument(familyId, file, `documents/${Date.now()}-${safe}`);
       if (!path) return setError('Upload failed. Check your connection and try again.');
       const res = await createDocument({
-        name, category, studentId, visibility, expiry, notes,
+        name, category, studentId, visibility: vis, expiry, notes, shareMemberIds,
         storagePath: path, fileName: file.name, mimeType: file.type, sizeBytes: file.size,
       });
       if (!res.ok) return setError(res.error);
@@ -76,12 +87,23 @@ export function DocumentUploadDialog({ familyId, students }: { familyId: string;
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Visibility" htmlFor="visibility">
-              <Select id="visibility" name="visibility" defaultValue="parents_admins">
+              <Select id="visibility" name="visibility" defaultValue="parents_admins" onChange={(e) => setVisibility(e.target.value)}>
                 {VISIBILITY.map((v) => <option key={v.v} value={v.v}>{v.label}</option>)}
               </Select>
             </Field>
             <Field label="Expiry date" htmlFor="expiry"><Input id="expiry" name="expiry" type="date" /></Field>
           </div>
+          {visibility === 'selected_members' && members.length > 0 && (
+            <Field label="Shared with">
+              <div className="flex flex-wrap gap-2">
+                {members.map((m) => (
+                  <label key={m.id} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-navy has-[:checked]:border-brand has-[:checked]:bg-brand-muted">
+                    <input type="checkbox" name={`s_${m.id}`} className="accent-brand" /> {m.name}
+                  </label>
+                ))}
+              </div>
+            </Field>
+          )}
           <Field label="Notes" htmlFor="notes"><Input id="notes" name="notes" placeholder="Optional" /></Field>
           {error && <p className="text-sm font-medium text-danger">{error}</p>}
           <div className="flex gap-2 pt-1">

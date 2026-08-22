@@ -96,4 +96,5 @@ export interface AttentionItem {
   title: string;
   detail: string;
   tone: 'attention' | 'danger' | 'brand';
+  href?: string;
 }

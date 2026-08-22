@@ -103,8 +103,8 @@ function StudentHome({ name, student }: { name: string; student: StudentSummary 
       <section className="space-y-3">
         <SectionTitle>Upcoming</SectionTitle>
         <Card className="divide-y divide-border">
-          {student.nextTask && <RowLine label={student.nextTask.title} meta={student.nextTask.due} />}
-          {student.nextTrip && <RowLine label={student.nextTrip.label} meta={student.nextTrip.date} />}
+          {student.nextTask && <RowLine href="/tasks" label={student.nextTask.title} meta={student.nextTask.due} />}
+          {student.nextTrip && <RowLine href="/travel" label={student.nextTrip.label} meta={student.nextTrip.date} />}
           {!student.nextTask && !student.nextTrip && (
             <div className="p-4 text-sm text-muted-foreground">Nothing upcoming right now.</div>
           )}
@@ -122,12 +122,17 @@ function StudentHome({ name, student }: { name: string; student: StudentSummary 
   );
 }
 
-function RowLine({ label, meta }: { label: string; meta: string }) {
-  return (
-    <div className="flex items-center justify-between p-4">
+function RowLine({ label, meta, href }: { label: string; meta: string; href?: string }) {
+  const inner = (
+    <>
       <p className="text-sm font-medium text-navy">{label}</p>
       <span className="text-xs font-semibold text-muted-foreground">{meta}</span>
-    </div>
+    </>
+  );
+  return href ? (
+    <Link href={href} className="flex items-center justify-between p-4 transition-colors hover:bg-muted">{inner}</Link>
+  ) : (
+    <div className="flex items-center justify-between p-4">{inner}</div>
   );
 }
 

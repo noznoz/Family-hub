@@ -29,6 +29,8 @@ export interface StudentDetail {
   advisor: string | null;
   startDate: string | null;
   expectedGraduation: string | null;
+  startDateISO: string | null;
+  expectedGraduationISO: string | null;
   years: { label: string; studyYear: number | null; status: string }[];
   funding: FundingPeriod[];
   milestones: Milestone[];
@@ -103,6 +105,8 @@ export async function getStudentDetail(studentId: string): Promise<StudentDetail
     advisor: sp.advisor ?? null,
     startDate: fmtDate(sp.start_date),
     expectedGraduation: fmtDate(sp.expected_graduation),
+    startDateISO: (sp.start_date as string | null) ?? null,
+    expectedGraduationISO: (sp.expected_graduation as string | null) ?? null,
     years: (((sp.years as { label: string; study_year: number | null; status: string }[]) ?? [])
       .sort((a, b) => (a.study_year ?? 0) - (b.study_year ?? 0))
       .map((y) => ({ label: y.label, studyYear: y.study_year, status: y.status }))),

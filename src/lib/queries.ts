@@ -195,7 +195,7 @@ async function getAttentionInner(familyId: string): Promise<AttentionItem[]> {
     .eq('family_id', familyId).eq('status', 'requested').limit(3);
   for (const r of reqs ?? []) {
     const who = one<{ display_name: string }>(r.requested_by)?.display_name ?? 'Someone';
-    items.push({ id: `req-${r.id}`, title: 'New payment request', detail: `${who} requested ${r.currency} ${r.amount} — ${r.reason}`, tone: 'brand' });
+    items.push({ id: `req-${r.id}`, title: 'New payment request', detail: `${who} requested ${r.currency} ${r.amount} — ${r.reason}`, tone: 'brand', href: '/money' });
   }
 
   const soon = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
@@ -204,7 +204,7 @@ async function getAttentionInner(familyId: string): Promise<AttentionItem[]> {
     .select('id, name, expiry_date')
     .eq('family_id', familyId).not('expiry_date', 'is', null).lte('expiry_date', soon).limit(3);
   for (const d of docs ?? []) {
-    items.push({ id: `doc-${d.id}`, title: `${d.name} expiring`, detail: `Expires ${d.expiry_date}`, tone: 'attention' });
+    items.push({ id: `doc-${d.id}`, title: `${d.name} expiring`, detail: `Expires ${d.expiry_date}`, tone: 'attention', href: '/documents' });
   }
 
   const dueSoon = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
@@ -213,7 +213,7 @@ async function getAttentionInner(familyId: string): Promise<AttentionItem[]> {
     .select('id, title, due_date, priority')
     .eq('family_id', familyId).neq('status', 'done').not('due_date', 'is', null).lte('due_date', dueSoon).limit(4);
   for (const t of tasks ?? []) {
-    items.push({ id: `task-${t.id}`, title: t.title, detail: `Due ${dueLabel(t.due_date)}`, tone: t.priority === 'urgent' ? 'danger' : 'attention' });
+    items.push({ id: `task-${t.id}`, title: t.title, detail: `Due ${dueLabel(t.due_date)}`, tone: t.priority === 'urgent' ? 'danger' : 'attention', href: '/tasks' });
   }
 
   return items;

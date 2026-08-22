@@ -289,34 +289,67 @@ export interface StudentAcademicsInput {
   studentId: string;
   course?: string;
   studentRef?: string;
+  campus?: string;
+  advisor?: string;
+  startDate?: string | null;
+  expectedGraduation?: string | null;
   universityName?: string;
+  universityCity?: string;
+  universityWebsite?: string;
 }
 
 export async function updateStudentAcademics(input: StudentAcademicsInput): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };
-  const g = await guard('admin_parent');
-  if (!g.ok) return g;
+  const session = await getSessionUser();
+  if (!session) return { ok: false, error: 'Not signed in.' };
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
 
-  let universityId: string | undefined;
+  // The student may edit their own academics; parents/admins may edit anyone's.
+  const { data: profile } = await supabase
+    .from('student_profiles')
+    .select('member_id, university_id, family_id')
+    .eq('id', input.studentId)
+    .maybeSingle();
+  if (!profile) return { ok: false, error: 'Student not found.' };
+  if (profile.family_id !== session.familyId) return { ok: false, error: 'Not in your family.' };
+  const role = session.member.role;
+  const allowed = role === 'admin' || role === 'parent' || session.memberId === profile.member_id;
+  if (!allowed) return { ok: false, error: 'You don’t have permission for this.' };
+
+  // Resolve / create the university, then keep its city & website current.
+  let universityId: string | undefined = (profile as { university_id?: string | null }).university_id ?? undefined;
   const name = input.universityName?.trim();
   if (name) {
-    const { data: existing } = await g.supabase
-      .from('universities').select('id').eq('family_id', g.session.familyId).ilike('name', name).maybeSingle();
+    const { data: existing } = await supabase
+      .from('universities').select('id').eq('family_id', session.familyId).ilike('name', name).maybeSingle();
     if (existing) universityId = existing.id;
     else {
-      const { data: created } = await g.supabase
-        .from('universities').insert({ family_id: g.session.familyId, name }).select('id').single();
+      const { data: created } = await supabase
+        .from('universities').insert({ family_id: session.familyId, name }).select('id').single();
       universityId = created?.id;
     }
   }
+  if (universityId && (name || input.universityCity !== undefined || input.universityWebsite !== undefined)) {
+    await supabase.from('universities').update({
+      ...(name ? { name } : {}),
+      city: input.universityCity?.trim() || null,
+      website: input.universityWebsite?.trim() || null,
+    }).eq('id', universityId).eq('family_id', session.familyId);
+  }
 
-  const { error } = await g.supabase.from('student_profiles').update({
-    course: input.course || null,
-    student_ref: input.studentRef || null,
+  const { error } = await supabase.from('student_profiles').update({
+    course: input.course?.trim() || null,
+    student_ref: input.studentRef?.trim() || null,
+    campus: input.campus?.trim() || null,
+    advisor: input.advisor?.trim() || null,
+    start_date: input.startDate || null,
+    expected_graduation: input.expectedGraduation || null,
     ...(universityId ? { university_id: universityId } : {}),
   }).eq('id', input.studentId);
   if (error) return { ok: false, error: error.message };
   revalidatePath('/university');
+  revalidatePath(`/students/${input.studentId}`);
   return { ok: true };
 }
 

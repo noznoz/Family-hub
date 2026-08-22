@@ -43,7 +43,7 @@ export default async function DocumentsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold tracking-tight text-navy">Documents</h1>
-        {canManage && <DocumentUploadDialog familyId={session.familyId} students={students} />}
+        {canManage && <DocumentUploadDialog familyId={session.familyId} students={students} members={members} />}
       </div>
 
       {docs.length === 0 ? (

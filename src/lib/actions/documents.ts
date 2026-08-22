@@ -30,6 +30,7 @@ export interface DocInput {
   fileName?: string;
   mimeType?: string;
   sizeBytes?: number;
+  shareMemberIds?: string[];
 }
 
 export async function createDocument(input: DocInput): Promise<Result> {
@@ -61,6 +62,12 @@ export async function createDocument(input: DocInput): Promise<Result> {
     size_bytes: input.sizeBytes || null,
     uploaded_by: g.userId,
   });
+
+  if (input.visibility === 'selected_members' && input.shareMemberIds?.length) {
+    await g.supabase.from('document_shares').insert(
+      input.shareMemberIds.map((member_id) => ({ document_id: doc.id, member_id })),
+    );
+  }
 
   await g.supabase.from('audit_logs').insert({
     family_id: g.session.familyId, actor_id: g.userId, action: 'document.create', entity: 'document', entity_id: doc.id, meta: {},
