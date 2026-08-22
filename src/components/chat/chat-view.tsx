@@ -2,15 +2,18 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pin, Send, ListPlus, HandCoins, Smile, ImagePlus, Loader2 } from 'lucide-react';
+import { Pin, Send, ListPlus, HandCoins, Smile, ImagePlus, Loader2, Plus } from 'lucide-react';
+import Link from 'next/link';
 import { Avatar } from '@/components/ui/avatar';
 import { Chip } from '@/components/ui/chip';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { uploadMedia } from '@/lib/storage';
-import { sendMessage, toggleReaction, convertMessageToTask, convertMessageToPayment } from '@/lib/actions/chat';
+import { sendMessage, toggleReaction, convertMessageToTask, convertMessageToPayment, createConversation } from '@/lib/actions/chat';
 import type { Message } from '@/lib/types';
 import type { Conversation } from '@/lib/chat-queries';
 
@@ -98,6 +101,18 @@ export function ChatView({
   return (
     <div className="flex h-[calc(100dvh-8rem)] flex-col md:h-[calc(100dvh-10rem)]">
       <div className="mb-3"><h1 className="text-2xl font-extrabold tracking-tight text-navy">{title}</h1></div>
+
+      {/* Channels */}
+      <div className="mb-3 flex items-center gap-2 overflow-x-auto pb-1">
+        {conversations.map((c) => (
+          <Link key={c.id} href={`/chat?c=${c.id}`}
+            className={cn('shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors',
+              c.id === conversationId ? 'bg-navy text-white' : 'bg-muted text-muted-foreground hover:bg-accent')}>
+            {c.title}
+          </Link>
+        ))}
+        {canSend && <NewChannelButton live={live} />}
+      </div>
 
       {pinned.length > 0 && (
         <div className="mb-3">
@@ -203,5 +218,46 @@ export function ChatView({
         </p>
       )}
     </div>
+  );
+}
+
+function NewChannelButton({ live }: { live: boolean }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const onSubmit = (fd: FormData) => {
+    const title = String(fd.get('title') ?? '').trim();
+    if (!title) return setError('Name is required.');
+    setError(null);
+    startTransition(async () => {
+      const res = live ? await createConversation(title) : { ok: true as const };
+      if (!res.ok) return setError(res.error);
+      setOpen(false);
+      if (live && 'id' in res && res.id) router.push(`/chat?c=${res.id}`);
+      else router.refresh();
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button type="button" aria-label="New channel" className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border text-navy-400 hover:bg-muted hover:text-navy">
+          <Plus className="size-4" />
+        </button>
+      </DialogTrigger>
+      <DialogContent title="New channel">
+        <form action={onSubmit} className="space-y-3">
+          <Input name="title" required autoFocus placeholder="e.g. Term 1, Trips, Hamza" />
+          {!live && <p className="rounded-lg bg-brand-muted px-3 py-2 text-xs text-navy">Demo mode — not saved.</p>}
+          {error && <p className="text-sm font-medium text-danger">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <DialogClose asChild><Button type="button" variant="outline" className="flex-1">Cancel</Button></DialogClose>
+            <Button type="submit" variant="brand" className="flex-1" disabled={pending}>{pending ? 'Creating…' : 'Create'}</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

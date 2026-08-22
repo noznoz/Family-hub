@@ -8,9 +8,10 @@ import { EmptyState } from '@/components/ui/empty-state';
 
 export const metadata: Metadata = { title: 'Chat' };
 
-export default async function ChatPage() {
+export default async function ChatPage({ searchParams }: { searchParams: Promise<{ c?: string }> }) {
   const session = await getSessionUser();
   if (!session) return null;
+  const { c } = await searchParams;
   const canSend = can(session.member.role, 'send_family_messages', session.overrides);
   const canConvert = can(session.member.role, 'approve_payment_requests', session.overrides);
 
@@ -39,7 +40,7 @@ export default async function ChatPage() {
       </div>
     );
   }
-  const active = conversations[0]!;
+  const active = conversations.find((cv) => cv.id === c) ?? conversations[0]!;
   const messages = await getMessages(active.id, session.memberId);
 
   return (

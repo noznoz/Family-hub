@@ -37,6 +37,31 @@ export async function sendMessage(conversationId: string, body: string, attachme
   return { ok: true, id: data.id };
 }
 
+/** Create a new family channel and add all active members to it. */
+export async function createConversation(title: string): Promise<Result> {
+  if (!title.trim()) return { ok: false, error: 'Name is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const session = await getSessionUser();
+  if (!session) return { ok: false, error: 'Not signed in.' };
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: conv, error } = await supabase
+    .from('conversations')
+    .insert({ family_id: session.familyId, kind: 'topic', title: title.trim(), created_by: user?.id ?? null })
+    .select('id').single();
+  if (error || !conv) return { ok: false, error: error?.message ?? 'Failed to create channel.' };
+
+  const { data: members } = await supabase
+    .from('family_members').select('id').eq('family_id', session.familyId).eq('status', 'active');
+  if (members?.length) {
+    await supabase.from('conversation_members').insert(members.map((m) => ({ conversation_id: conv.id, member_id: m.id })));
+  }
+  revalidatePath('/chat');
+  return { ok: true, id: conv.id };
+}
+
 /** Toggle an emoji reaction on a message for the current member. */
 export async function toggleReaction(messageId: string, emoji: string): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };
