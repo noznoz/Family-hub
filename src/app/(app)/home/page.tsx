@@ -6,6 +6,7 @@ import { getStudents, getAttention } from '@/lib/queries';
 import { demoStudents, demoAttention } from '@/lib/demo-data';
 import { StudentCard } from '@/components/home/student-card';
 import { AttentionList } from '@/components/home/attention-list';
+import { NextPrayerCard } from '@/components/prayer/next-prayer-card';
 import { SectionTitle } from '@/components/ui/section-title';
 import { Card } from '@/components/ui/card';
 import type { StudentSummary } from '@/lib/types';
@@ -35,6 +36,8 @@ export default async function HomePage() {
         <p className="text-sm font-medium text-muted-foreground">{greeting}</p>
         <h1 className="text-2xl font-extrabold tracking-tight text-navy">Hi {member.displayName} 👋</h1>
       </div>
+
+      <NextPrayerCard />
 
       {students.length === 0 ? (
         <Card className="p-6 text-center text-sm text-muted-foreground">
@@ -81,6 +84,8 @@ function StudentHome({ name, student }: { name: string; student: StudentSummary 
         <h1 className="text-2xl font-extrabold tracking-tight text-navy">Good day, {name} 👋</h1>
         <p className="mt-1 text-sm text-muted-foreground">{student.university} · {student.academicYear}</p>
       </div>
+
+      <NextPrayerCard />
 
       <div className="grid grid-cols-2 gap-3">
         {shortcuts.map(({ href, label, icon: Icon, tone }) => (
