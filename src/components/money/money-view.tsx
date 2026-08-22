@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, HandCoins, Check, X, Banknote, Pencil, Wallet, Paperclip } from 'lucide-react';
+import { Plus, HandCoins, Check, X, Banknote, Pencil, Wallet, Paperclip, Download } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,18 @@ import { MoneyFormDialog } from './money-form-dialog';
 import { BudgetDialog } from './budget-dialog';
 import type { Expense, PaymentRequest } from '@/lib/types';
 import type { BudgetSnapshot } from '@/lib/queries';
+
+function exportExpensesCsv(expenses: Expense[]) {
+  const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const header = ['Date', 'Student', 'Category', 'Description', 'Amount', 'Currency', 'Funding'];
+  const rows = expenses.map((e) => [e.spentOn, e.student, e.category, e.description, e.amount, e.currency, e.fundingLabel].map(esc).join(','));
+  const csv = [header.map(esc).join(','), ...rows].join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `family-hub-expenses-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
 
 const TABS = ['Overview', 'Expenses', 'Requests'] as const;
 type Tab = (typeof TABS)[number];
@@ -46,20 +58,28 @@ export function MoneyView({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold tracking-tight text-navy">Money</h1>
-        {(isStudent || canManage) && (
-        <MoneyFormDialog
-          live={live}
-          students={students}
-          familyId={familyId}
-          mode={isStudent ? 'request' : 'expense'}
-          defaultStudentId={onlyStudent ? students.find((s) => s.name === onlyStudent)?.id : undefined}
-          trigger={
-            <Button variant="brand" size="sm">
-              <Plus className="size-4" /> {isStudent ? 'Request' : 'Add'}
-            </Button>
-          }
-        />
-        )}
+        <div className="flex items-center gap-2">
+          {expenses.length > 0 && (
+            <button type="button" onClick={() => exportExpensesCsv(expenses)} aria-label="Export expenses"
+              className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy">
+              <Download className="size-4" />
+            </button>
+          )}
+          {(isStudent || canManage) && (
+          <MoneyFormDialog
+            live={live}
+            students={students}
+            familyId={familyId}
+            mode={isStudent ? 'request' : 'expense'}
+            defaultStudentId={onlyStudent ? students.find((s) => s.name === onlyStudent)?.id : undefined}
+            trigger={
+              <Button variant="brand" size="sm">
+                <Plus className="size-4" /> {isStudent ? 'Request' : 'Add'}
+              </Button>
+            }
+          />
+          )}
+        </div>
       </div>
 
       <div className="flex gap-2">

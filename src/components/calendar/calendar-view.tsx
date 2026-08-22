@@ -103,13 +103,14 @@ export function CalendarView({
                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                   <Chip tone={kindTone[e.kind] ?? 'neutral'} className="capitalize">{e.kind.replace(/_/g, ' ')}</Chip>
                   {e.student && <Chip tone="navy">{e.student}</Chip>}
+                  {e.derived && <Chip tone="neutral">auto</Chip>}
                   <span className="text-xs text-muted-foreground">{e.whenRaw}</span>
                 </div>
               </div>
               <div className="flex shrink-0 items-center">
                 <ShareButton text={`📅 ${e.title}\n${e.whenRaw}${e.student ? ` · ${e.student}` : ''}`} url="/calendar" />
                 <ReminderButton entityType="calendar_event" entityId={e.id} title={e.title} link="/calendar" live={live} meId={meId} />
-                {canManage && (
+                {canManage && !e.derived && (
                   <>
                     <EventFormDialog live={live} students={students} event={e}
                       trigger={<button type="button" aria-label="Edit event" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>} />

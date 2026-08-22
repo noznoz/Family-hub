@@ -182,29 +182,54 @@ export async function getScholarshipInfo(familyId: string): Promise<ScholarshipV
 // ── Calendar ────────────────────────────────────────────────────────────────
 export interface CalEvent {
   id: string; title: string; kind: string; when: string; whenRaw: string; student: string | null;
-  studentId: string | null; startsAtInput: string;
+  studentId: string | null; startsAtInput: string; derived?: boolean;
 }
 export async function getCalendar(familyId: string): Promise<CalEvent[]> {
   const supabase = await createClient();
   if (!supabase) return [];
-  const { data } = await supabase
-    .from('calendar_events')
-    .select('id, title, kind, starts_at, student_id, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name))')
-    .eq('family_id', familyId)
-    .gte('starts_at', new Date(Date.now() - 86_400_000).toISOString())
-    .order('starts_at', { ascending: true })
-    .limit(50);
-  return (data ?? []).map((e) => ({
-    id: e.id,
-    title: e.title,
-    kind: e.kind,
-    when: dueLabel(e.starts_at),
-    whenRaw: fmtDate(e.starts_at),
+  const since = new Date(Date.now() - 86_400_000).toISOString();
+  const horizon = new Date(Date.now() + 200 * 86_400_000).toISOString();
+
+  const [evRes, docRes, tripRes, accRes] = await Promise.all([
+    supabase.from('calendar_events')
+      .select('id, title, kind, starts_at, student_id, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name))')
+      .eq('family_id', familyId).gte('starts_at', since).order('starts_at', { ascending: true }).limit(80),
+    supabase.from('documents').select('id, name, expiry_date').eq('family_id', familyId).not('expiry_date', 'is', null).gte('expiry_date', since.slice(0, 10)).limit(50),
+    supabase.from('trips').select('id, title, depart_at').eq('family_id', familyId).not('depart_at', 'is', null).gte('depart_at', since).lte('depart_at', horizon).limit(50),
+    supabase.from('accommodations').select('id, property, payment_date, end_date, currency, monthly_rent').eq('family_id', familyId).not('payment_date', 'is', null).limit(20),
+  ]);
+
+  const events: CalEvent[] = (evRes.data ?? []).map((e) => ({
+    id: e.id, title: e.title, kind: e.kind, when: dueLabel(e.starts_at), whenRaw: fmtDate(e.starts_at),
     student: one<{ member: { display_name: string } | null }>(e.student)?.member?.display_name ?? null,
     studentId: (e as { student_id?: string | null }).student_id ?? null,
-    // Local datetime for <input type="datetime-local"> (YYYY-MM-DDTHH:mm).
     startsAtInput: e.starts_at ? toLocalInput(e.starts_at) : '',
   }));
+
+  const derive = (id: string, title: string, kind: string, iso: string): CalEvent => ({
+    id, title, kind, when: dueLabel(iso), whenRaw: fmtDate(iso), student: null, studentId: null,
+    startsAtInput: toLocalInput(iso), derived: true,
+  });
+
+  for (const d of docRes.data ?? []) {
+    if (d.expiry_date) events.push(derive(`doc-${d.id}`, `${d.name} expires`, 'doc_expiry', `${d.expiry_date}T09:00:00`));
+  }
+  for (const t of tripRes.data ?? []) {
+    if (t.depart_at) events.push(derive(`trip-${t.id}`, `Trip: ${t.title}`, 'flight', t.depart_at));
+  }
+  // Next rent due date for each current accommodation with a payment day.
+  const today = new Date();
+  for (const a of accRes.data ?? []) {
+    const day = a.payment_date as number | null;
+    if (!day) continue;
+    if (a.end_date && a.end_date < today.toISOString().slice(0, 10)) continue;
+    const due = new Date(today.getFullYear(), today.getMonth(), day);
+    if (due < today) due.setMonth(due.getMonth() + 1);
+    const rentLabel = a.monthly_rent ? ` (${a.currency ?? 'GBP'} ${a.monthly_rent})` : '';
+    events.push(derive(`rent-${a.id}`, `Rent due — ${a.property}${rentLabel}`, 'rent', `${due.toISOString().slice(0, 10)}T09:00:00`));
+  }
+
+  return events.sort((x, y) => (x.startsAtInput < y.startsAtInput ? -1 : 1));
 }
 
 /** ISO timestamp → value for <input type="datetime-local"> in local time. */
