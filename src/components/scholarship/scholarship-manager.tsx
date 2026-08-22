@@ -8,6 +8,7 @@ import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
+import { ShareButton } from '@/components/ui/share-button';
 import { Dialog, DialogContent, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Field, Select } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -50,6 +51,9 @@ export function ScholarshipManager({
                 <p className="font-bold text-navy">{s.name}</p>
                 <div className="flex items-center gap-1">
                   <Chip tone={s.stage === 'active' ? 'success' : 'brand'} className="capitalize">{label(s.stage)}</Chip>
+                  <ShareButton
+                    text={`🎓 ${s.name} — Scholarship\nStage: ${label(s.stage)}${s.sponsor ? `\nSponsor: ${s.sponsor}` : ''}${s.funding.length ? `\nFunding: ${s.funding.map((f) => f.label).join(', ')}` : ''}`}
+                    url="/scholarship" />
                   {canManage && (
                     <ScholarshipDialog student={s} live={live}
                       trigger={<button type="button" aria-label="Edit scholarship" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>} />

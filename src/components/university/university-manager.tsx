@@ -9,6 +9,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DeleteButton } from '@/components/ui/delete-button';
+import { ShareButton } from '@/components/ui/share-button';
 import { Dialog, DialogContent, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Field, Select } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -43,10 +44,15 @@ export function UniversityManager({
                   <p className="text-sm text-muted-foreground">{s.university}</p>
                 </div>
               </div>
-              {canManage && (
-                <AcademicsDialog student={s} live={live}
-                  trigger={<Button variant="outline" size="sm"><Pencil className="size-4" /> Edit</Button>} />
-              )}
+              <div className="flex items-center gap-1">
+                <ShareButton
+                  text={`🎓 ${s.name}\n${s.university}${s.course !== '—' ? ` · ${s.course}` : ''}${s.ref !== '—' ? `\nStudent ID: ${s.ref}` : ''}${s.years.length ? `\n${s.years.map((y) => `Year ${y.studyYear ?? '?'} (${y.status})`).join(', ')}` : ''}`}
+                  url="/university" />
+                {canManage && (
+                  <AcademicsDialog student={s} live={live}
+                    trigger={<Button variant="outline" size="sm"><Pencil className="size-4" /> Edit</Button>} />
+                )}
+              </div>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
               <div><p className="text-xs font-semibold uppercase text-muted-foreground">Course</p><p className="text-navy">{s.course}</p></div>

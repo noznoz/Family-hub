@@ -227,6 +227,17 @@ export async function addRecipePhoto(recipeId: string, storagePath: string, capt
   return { ok: true };
 }
 
+/** Set (or clear) the photo on a single recipe step. */
+export async function setRecipeStepImage(stepId: string, recipeId: string, storagePath: string | null): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const g = await guard();
+  if (!g.ok) return g;
+  const { error } = await g.supabase.from('recipe_steps').update({ image_path: storagePath }).eq('id', stepId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/support/recipes/${recipeId}`);
+  return { ok: true };
+}
+
 export async function deleteRecipePhoto(mediaId: string, recipeId: string): Promise<Result> {
   if (!isSupabaseConfigured) return { ok: true };
   const g = await guard();

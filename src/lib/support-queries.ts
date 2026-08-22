@@ -50,7 +50,7 @@ export async function getRecipes(familyId: string): Promise<RecipeCard[]> {
 
 export interface RecipeDetail extends RecipeCard {
   ingredients: string[];
-  steps: { no: number; body: string; image: string | null }[];
+  steps: { id: string; no: number; body: string; image: string | null }[];
   audio: { id: string; url: string | null; duration: number | null }[];
   photos: { id: string; url: string | null; caption: string | null }[];
 }
@@ -60,15 +60,15 @@ export async function getRecipe(id: string): Promise<RecipeDetail | null> {
   if (!supabase) return null;
   const { data: r } = await supabase
     .from('recipes')
-    .select('id, name, category, description, prep_minutes, cook_minutes, difficulty, servings, cover_path, ingredients:recipe_ingredients(text, sort_order), steps:recipe_steps(step_no, body, image_path), audio:support_audio(id, storage_path, duration_sec), media:recipe_media(id, storage_path, caption, sort_order)')
+    .select('id, name, category, description, prep_minutes, cook_minutes, difficulty, servings, cover_path, ingredients:recipe_ingredients(text, sort_order), steps:recipe_steps(id, step_no, body, image_path), audio:support_audio(id, storage_path, duration_sec), media:recipe_media(id, storage_path, caption, sort_order)')
     .eq('id', id)
     .maybeSingle();
   if (!r) return null;
 
   const steps = await Promise.all(
-    (((r.steps as { step_no: number; body: string; image_path: string | null }[]) ?? [])
+    (((r.steps as { id: string; step_no: number; body: string; image_path: string | null }[]) ?? [])
       .sort((a, b) => a.step_no - b.step_no))
-      .map(async (s) => ({ no: s.step_no, body: s.body, image: await signed(s.image_path) })),
+      .map(async (s) => ({ id: s.id, no: s.step_no, body: s.body, image: await signed(s.image_path) })),
   );
   const audio = await Promise.all(
     (((r.audio as { id: string; storage_path: string; duration_sec: number | null }[]) ?? []))

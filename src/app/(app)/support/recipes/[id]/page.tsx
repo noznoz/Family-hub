@@ -10,6 +10,7 @@ import { Chip } from '@/components/ui/chip';
 import { VoiceRecorder } from '@/components/support/voice-recorder';
 import { RecipeHeaderActions } from '@/components/support/recipe-header-actions';
 import { RecipeCoverButton, RecipePhotos } from '@/components/support/recipe-photos';
+import { StepPhotoButton } from '@/components/support/step-photo-button';
 import { ShareButton } from '@/components/ui/share-button';
 import type { RecipeDetail } from '@/lib/support-queries';
 
@@ -115,11 +116,16 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
             {recipe.steps.map((s) => (
               <Card key={s.no} className="flex gap-3 p-4">
                 <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-navy text-sm font-bold text-white">{s.no}</span>
-                <div className="pt-0.5">
+                <div className="flex-1 pt-0.5">
                   <p className="text-navy">{s.body}</p>
                   {s.image && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={s.image} alt={`Step ${s.no}`} className="mt-2 rounded-xl" />
+                  )}
+                  {canEdit && (
+                    <div className="mt-2">
+                      <StepPhotoButton stepId={s.id} recipeId={recipe.id} familyId={session.familyId} hasImage={!!s.image} live={!session.isDemo} />
+                    </div>
                   )}
                 </div>
               </Card>
