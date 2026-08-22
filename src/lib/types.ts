@@ -48,6 +48,7 @@ export interface Task {
   studentId?: string | null;
   assigneeId?: string | null;
   repeat?: string | null;
+  attachmentUrl?: string | null;
 }
 
 export interface Message {

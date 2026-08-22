@@ -23,6 +23,7 @@ export default async function TasksPage() {
       tasks={tasks}
       live={!session.isDemo}
       meId={session.memberId}
+      familyId={session.familyId}
       students={students.map((s) => ({ id: s.id, name: s.name }))}
       members={members.map((m) => ({ id: m.id, name: m.displayName }))}
     />

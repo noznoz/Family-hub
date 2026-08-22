@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Plus, Check, Pencil } from 'lucide-react';
+import { Plus, Check, Pencil, Paperclip } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
@@ -29,12 +29,14 @@ export function TasksView({
   tasks: initial,
   live,
   meId,
+  familyId,
   students,
   members,
 }: {
   tasks: Task[];
   live: boolean;
   meId: string;
+  familyId: string;
   students: { id: string; name: string }[];
   members: { id: string; name: string }[];
 }) {
@@ -79,6 +81,7 @@ export function TasksView({
         <h1 className="text-2xl font-extrabold tracking-tight text-navy">Tasks</h1>
         <TaskCreateDialog
           live={live}
+          familyId={familyId}
           students={students}
           members={members}
           onCreated={onCreated}
@@ -129,6 +132,11 @@ export function TasksView({
                   {t.repeat && t.repeat !== 'none' && <Chip tone="neutral">🔁 {t.repeat}</Chip>}
                   {t.status !== 'done' && <Chip tone="brand">{statusLabel[t.status]}</Chip>}
                   {t.due && <span className="text-xs font-semibold text-muted-foreground">{t.due}</span>}
+                  {t.attachmentUrl && (
+                    <a href={t.attachmentUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
+                      <Paperclip className="size-3" /> File
+                    </a>
+                  )}
                 </div>
               </div>
               <div className="flex shrink-0 items-center">
@@ -148,6 +156,7 @@ export function TasksView({
                 />
                 <TaskCreateDialog
                   live={live}
+          familyId={familyId}
                   students={students}
                   members={members}
                   task={t}

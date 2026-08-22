@@ -15,6 +15,7 @@ export interface CreateTaskInput {
   studentId?: string | null;
   assigneeId?: string | null;
   repeat?: string | null;   // 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
+  attachmentPath?: string | null;
 }
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -62,6 +63,7 @@ export async function createTask(input: CreateTaskInput): Promise<Result> {
     due_date: input.dueDate || null,
     student_id: input.studentId || null,
     assignee_id: input.assigneeId || null,
+    attachment_url: input.attachmentPath || null,
     created_by: user?.id ?? null,
   }).select('id').single();
   if (error) return { ok: false, error: error.message };
@@ -111,6 +113,7 @@ export async function updateTask(input: UpdateTaskInput): Promise<Result> {
       due_date: input.dueDate || null,
       student_id: input.studentId || null,
       assignee_id: input.assigneeId || null,
+      ...(input.attachmentPath !== undefined ? { attachment_url: input.attachmentPath } : {}),
     })
     .eq('id', input.id);
   if (error) return { ok: false, error: error.message };

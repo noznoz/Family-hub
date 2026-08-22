@@ -1,16 +1,19 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
+import { Paperclip } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Field, Select } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { uploadMedia } from '@/lib/storage';
 import { createTask, updateTask } from '@/lib/actions/tasks';
 import type { Task, TaskPriority } from '@/lib/types';
 
 export function TaskCreateDialog({
   trigger,
   live,
+  familyId,
   students,
   members,
   onCreated,
@@ -19,6 +22,7 @@ export function TaskCreateDialog({
 }: {
   trigger: React.ReactNode;
   live: boolean;
+  familyId?: string;
   students: { id: string; name: string }[];
   members: { id: string; name: string }[];
   onCreated?: (t: Task) => void;
@@ -30,6 +34,8 @@ export function TaskCreateDialog({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const onSubmit = (formData: FormData) => {
     const title = String(formData.get('title') ?? '').trim();
@@ -48,9 +54,16 @@ export function TaskCreateDialog({
     const assigneeName = members.find((m) => m.id === assigneeId)?.name;
 
     startTransition(async () => {
+      let attachmentPath: string | undefined;
+      if (file && live && familyId) {
+        const safe = file.name.replace(/[^\w.\-]+/g, '_');
+        const path = await uploadMedia(familyId, file, `tasks/${Date.now()}-${safe}`);
+        if (!path) { setError('Attachment upload failed. Try again.'); return; }
+        attachmentPath = path;
+      }
       const res = isEdit
-        ? await updateTask({ id: task!.id, title, description, priority, dueDate, studentId, assigneeId, repeat })
-        : await createTask({ title, description, priority, dueDate, studentId, assigneeId, repeat });
+        ? await updateTask({ id: task!.id, title, description, priority, dueDate, studentId, assigneeId, repeat, ...(attachmentPath ? { attachmentPath } : {}) })
+        : await createTask({ title, description, priority, dueDate, studentId, assigneeId, repeat, attachmentPath });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -68,9 +81,11 @@ export function TaskCreateDialog({
         studentId,
         assigneeId,
         repeat,
+        attachmentUrl: attachmentPath ? '#' : task?.attachmentUrl ?? null,
       };
       if (isEdit) onSaved?.(next);
       else onCreated?.(next);
+      setFile(null);
       setOpen(false);
     });
   };
@@ -124,6 +139,13 @@ export function TaskCreateDialog({
                 ))}
               </Select>
             </Field>
+          </div>
+          <div>
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-3 py-2.5 text-sm font-semibold text-navy hover:bg-muted">
+              <Paperclip className="size-4 text-navy-400" />
+              {file ? file.name : task?.attachmentUrl ? 'Replace attachment' : 'Attach a file (optional)'}
+            </button>
           </div>
           {!live && (
             <p className="rounded-lg bg-brand-muted px-3 py-2 text-xs text-navy">
