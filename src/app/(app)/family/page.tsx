@@ -20,7 +20,7 @@ export default async function FamilyPage() {
         <h1 className="text-2xl font-extrabold tracking-tight text-navy">Family</h1>
         {canManage && <AddMemberDialog live={!session.isDemo} />}
       </div>
-      <FamilyMembers members={members} canManage={canManage} />
+      <FamilyMembers members={members} canManage={canManage} currentMemberId={session.memberId} />
     </div>
   );
 }

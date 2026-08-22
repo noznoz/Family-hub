@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Settings2, Check, Loader2, ShieldCheck } from 'lucide-react';
+import { Mail, Settings2, Check, Loader2, ShieldCheck, Trash2, AlertTriangle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Chip } from '@/components/ui/chip';
@@ -12,7 +12,7 @@ import { Field, Select } from '@/components/ui/field';
 import { Dialog, DialogContent, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import {
   setMemberEmail, updateMemberRole, setMemberStatus, setMemberRelationship,
-  getMemberPermissions, setMemberPermission, type MemberPermissionRow,
+  getMemberPermissions, setMemberPermission, deleteFamilyMember, type MemberPermissionRow,
 } from '@/lib/actions/family';
 import { PERMISSION_LABELS, type Permission } from '@/lib/permissions';
 import type { Member } from '@/lib/types';
@@ -20,7 +20,7 @@ import type { SystemRole } from '@/lib/permissions';
 
 const roleTone = (m: Member) => (m.role === 'admin' ? 'navy' : m.role === 'parent' ? 'brand' : m.isStudent ? 'success' : 'neutral');
 
-export function FamilyMembers({ members, canManage }: { members: Member[]; canManage: boolean }) {
+export function FamilyMembers({ members, canManage, currentMemberId }: { members: Member[]; canManage: boolean; currentMemberId?: string }) {
   const pending = members.filter((m) => m.status === 'invited');
   const active = members.filter((m) => m.status !== 'invited');
 
@@ -48,7 +48,7 @@ export function FamilyMembers({ members, canManage }: { members: Member[]; canMa
             </div>
             {canManage && (
               <div className="flex flex-col gap-1">
-                <ManageDialog member={m} />
+                <ManageDialog member={m} isSelf={m.id === currentMemberId} />
                 <PermissionsDialog member={m} />
               </div>
             )}
@@ -149,11 +149,22 @@ function PermissionsDialog({ member }: { member: Member }) {
   );
 }
 
-function ManageDialog({ member }: { member: Member }) {
+function ManageDialog({ member, isSelf }: { member: Member; isSelf: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const onDelete = () => {
+    setError(null);
+    start(async () => {
+      const r = await deleteFamilyMember(member.id);
+      if (!r.ok) { setError(r.error); setConfirmDelete(false); return; }
+      setOpen(false);
+      router.refresh();
+    });
+  };
 
   const onSubmit = (formData: FormData) => {
     const email = String(formData.get('email') ?? '');
@@ -174,7 +185,7 @@ function ManageDialog({ member }: { member: Member }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setConfirmDelete(false); setError(null); } }}>
       <DialogTrigger asChild>
         <button aria-label={`Manage ${member.displayName}`} className="rounded-lg p-2 text-navy-300 hover:bg-muted hover:text-navy">
           <Settings2 className="size-5" />
@@ -208,6 +219,45 @@ function ManageDialog({ member }: { member: Member }) {
             <Button type="submit" variant="brand" className="flex-1" disabled={pending}>{pending ? 'Saving…' : 'Save'}</Button>
           </div>
         </form>
+
+        {!isSelf && (
+          <div className="mt-4 rounded-xl border border-danger/30 bg-danger/5 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-danger">
+              <AlertTriangle className="size-3.5" /> Danger zone
+            </p>
+            {!confirmDelete ? (
+              <>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Remove {member.displayName} from the family. Their tasks and messages stay, but they lose access and their profile is deleted. This can’t be undone.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-2 w-full border-danger/40 text-danger hover:bg-danger/10"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={pending}
+                >
+                  <Trash2 className="mr-1.5 size-4" /> Delete member
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="mt-1.5 text-sm font-semibold text-navy">
+                  Delete {member.displayName}? This can’t be undone.
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setConfirmDelete(false)} disabled={pending}>
+                    Keep
+                  </Button>
+                  <Button type="button" variant="danger" className="flex-1" onClick={onDelete} disabled={pending}>
+                    {pending ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Trash2 className="mr-1.5 size-4" />}
+                    Yes, delete
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

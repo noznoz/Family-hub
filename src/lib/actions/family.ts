@@ -111,6 +111,58 @@ export async function setMemberStatus(memberId: string, status: 'active' | 'disa
   return { ok: true };
 }
 
+/**
+ * Permanently remove a family member. Dependent rows cascade (relationships,
+ * permissions, chat memberships, reactions, receipts, push subs) or null out
+ * (task assignee, message sender, payment parties) per the schema's FKs, so
+ * authored content is preserved while the person is removed. Guards against
+ * self-deletion and removing the family's last admin (lockout).
+ */
+export async function deleteFamilyMember(memberId: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const session = await getSessionUser();
+  if (!session) return { ok: false, error: 'Not signed in.' };
+  if (!can(session.member.role, 'manage_family_members', session.overrides)) {
+    return { ok: false, error: 'You do not have permission to manage family members.' };
+  }
+  if (memberId === session.memberId) {
+    return { ok: false, error: 'You can’t delete your own account here.' };
+  }
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+
+  // Prevent removing the last admin and leaving the family locked out.
+  const { data: target } = await supabase
+    .from('family_members')
+    .select('role, family_id')
+    .eq('id', memberId)
+    .single();
+  if (!target) return { ok: false, error: 'That member no longer exists.' };
+  if (target.family_id !== session.familyId) {
+    return { ok: false, error: 'That member is not in your family.' };
+  }
+  if (target.role === 'admin') {
+    const { count } = await supabase
+      .from('family_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('family_id', session.familyId)
+      .eq('role', 'admin');
+    if ((count ?? 0) <= 1) {
+      return { ok: false, error: 'You can’t delete the last admin. Make someone else an admin first.' };
+    }
+  }
+
+  const {
+    data: { user },
+  } = (await supabase.auth.getUser()) ?? { data: { user: null } };
+  const { error } = await supabase.from('family_members').delete().eq('id', memberId);
+  if (error) return { ok: false, error: error.message };
+  await audit(session.familyId, user?.id ?? null, 'member.delete', memberId, { role: target.role });
+
+  revalidatePath('/family');
+  return { ok: true };
+}
+
 export interface MemberPermissionRow { key: Permission; label: string; roleDefault: boolean; effective: boolean; override: boolean | null }
 
 /** Load a member's permissions: role default, current override, effective value. */
