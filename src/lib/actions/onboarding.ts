@@ -50,31 +50,58 @@ async function ensureMembershipInner(): Promise<OnboardResult> {
       { onConflict: 'id' },
     );
 
-  // Already a member?
-  const { data: existing } = await admin
-    .from('family_members')
-    .select('id, status')
-    .eq('profile_id', user.id)
-    .maybeSingle();
-  if (existing) return existing.status === 'active' ? 'active' : 'pending';
-
-  // Link to a pre-invited slot whose email matches this user (any family).
-  // This is how an admin onboards others: set a member's login email, they sign
-  // up with it, and they land straight into that member (with its role).
-  if (user.email) {
-    const { data: invited } = await admin
+  // Find an unlinked, pre-invited slot whose email matches this user (any
+  // family). This is how an admin onboards others: set a member's login email,
+  // they sign up with it, and they land straight into that member (with its role).
+  const findInviteSlot = async (): Promise<{ id: string; role: string } | null> => {
+    if (!user.email) return null;
+    const { data } = await admin
       .from('family_members')
-      .select('id')
+      .select('id, role')
       .is('profile_id', null)
       .ilike('invite_email', user.email)
       .limit(1)
       .maybeSingle();
-    if (invited) {
-      const { error } = await admin
-        .from('family_members')
-        .update({ profile_id: user.id, status: 'active' })
-        .eq('id', invited.id);
-      if (!error) return 'active';
+    return data ?? null;
+  };
+  const linkSlot = async (slot: { id: string; role: string }): Promise<OnboardResult | null> => {
+    const { error } = await admin
+      .from('family_members')
+      .update({ profile_id: user.id, status: 'active' })
+      .eq('id', slot.id);
+    if (error) return null;
+    return slot.role === 'admin' ? 'admin' : 'active';
+  };
+
+  // Already a member?
+  const { data: existing } = await admin
+    .from('family_members')
+    .select('id, role, status')
+    .eq('profile_id', user.id)
+    .maybeSingle();
+  if (existing) {
+    // Self-heal: this user was auto-created as a plain family member (e.g. they
+    // signed in before an admin set their real email, or their slot still had a
+    // placeholder). If a proper invited slot now matches their email — like the
+    // student profile an admin prepared — move them into it and drop the
+    // duplicate. Never touch an existing admin/parent/student membership.
+    if (existing.role === 'family_member') {
+      const slot = await findInviteSlot();
+      if (slot && slot.id !== existing.id) {
+        await admin.from('family_members').delete().eq('id', existing.id);
+        const healed = await linkSlot(slot);
+        if (healed) return healed;
+      }
+    }
+    return existing.status === 'active' ? 'active' : 'pending';
+  }
+
+  // First-time sign-in: link straight into a matching invited slot.
+  {
+    const slot = await findInviteSlot();
+    if (slot) {
+      const linked = await linkSlot(slot);
+      if (linked) return linked;
     }
   }
 
