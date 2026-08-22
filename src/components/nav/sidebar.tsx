@@ -7,7 +7,7 @@ import { tNav, type Locale } from '@/lib/locale';
 import { cn } from '@/lib/utils';
 import { AppLogo } from '@/components/brand/app-logo';
 
-export function Sidebar({ locale = 'en' }: { locale?: Locale }) {
+export function Sidebar({ locale = 'en', chatUnread = 0 }: { locale?: Locale; chatUnread?: number }) {
   const pathname = usePathname();
   const items = [...primaryNav.filter((i) => i.href !== '/more'), ...moreNav];
   return (
@@ -30,7 +30,12 @@ export function Sidebar({ locale = 'en' }: { locale?: Locale }) {
               aria-current={active ? 'page' : undefined}
             >
               <Icon className="size-5" />
-              {tNav(label, locale)}
+              <span className="flex-1">{tNav(label, locale)}</span>
+              {href === '/chat' && chatUnread > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-xs font-bold text-white">
+                  {chatUnread > 9 ? '9+' : chatUnread}
+                </span>
+              )}
             </Link>
           );
         })}

@@ -6,7 +6,7 @@ import { primaryNav } from './nav-items';
 import { tNav, type Locale } from '@/lib/locale';
 import { cn } from '@/lib/utils';
 
-export function BottomNav({ locale = 'en' }: { locale?: Locale }) {
+export function BottomNav({ locale = 'en', chatUnread = 0 }: { locale?: Locale; chatUnread?: number }) {
   const pathname = usePathname();
   return (
     <nav
@@ -27,7 +27,14 @@ export function BottomNav({ locale = 'en' }: { locale?: Locale }) {
                 )}
                 aria-current={active ? 'page' : undefined}
               >
-                <Icon className={cn('size-6', active && 'stroke-[2.5]')} />
+                <span className="relative">
+                  <Icon className={cn('size-6', active && 'stroke-[2.5]')} />
+                  {href === '/chat' && chatUnread > 0 && (
+                    <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
+                      {chatUnread > 9 ? '9+' : chatUnread}
+                    </span>
+                  )}
+                </span>
                 {tNav(label, locale)}
               </Link>
             </li>

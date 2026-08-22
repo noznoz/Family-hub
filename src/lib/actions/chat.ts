@@ -37,6 +37,19 @@ export async function sendMessage(conversationId: string, body: string, attachme
   return { ok: true, id: data.id };
 }
 
+/** Mark a conversation as read up to now for the current member. */
+export async function markConversationRead(conversationId: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const session = await getSessionUser();
+  if (!session) return { ok: false, error: 'Not signed in.' };
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+  await supabase.from('conversation_members')
+    .update({ last_read_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId).eq('member_id', session.memberId);
+  return { ok: true };
+}
+
 /** Create a new family channel and add all active members to it. */
 export async function createConversation(title: string): Promise<Result> {
   if (!title.trim()) return { ok: false, error: 'Name is required.' };

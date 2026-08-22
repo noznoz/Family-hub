@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { uploadMedia } from '@/lib/storage';
-import { sendMessage, toggleReaction, convertMessageToTask, convertMessageToPayment, createConversation } from '@/lib/actions/chat';
+import { sendMessage, toggleReaction, convertMessageToTask, convertMessageToPayment, createConversation, markConversationRead } from '@/lib/actions/chat';
 import type { Message } from '@/lib/types';
 import type { Conversation } from '@/lib/chat-queries';
 
@@ -45,6 +45,13 @@ export function ChatView({
 
   useEffect(() => setMessages(initial), [initial]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
+
+  // Mark this conversation read on open / when new messages arrive while viewing.
+  useEffect(() => {
+    if (!live) return;
+    void markConversationRead(conversationId).then(() => router.refresh());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, conversationId, initial.length]);
 
   useEffect(() => {
     if (!live) return;
