@@ -24,6 +24,7 @@ export interface StudentSummary {
   id: string;
   memberId: string;
   name: string;
+  avatarUrl?: string | null;
   university: string;
   academicYear: string;
   funding: string;

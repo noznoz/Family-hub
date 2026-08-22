@@ -71,7 +71,7 @@ interface StudentRow {
   course: string | null;
   overall_status: string | null;
   status: string;
-  member: { display_name: string } | null;
+  member: { display_name: string; avatar_path: string | null } | null;
   university: { name: string } | null;
 }
 
@@ -81,7 +81,7 @@ export async function getStudents(familyId: string): Promise<StudentSummary[]> {
     if (!supabase) return [];
     const { data } = await supabase
       .from('student_profiles')
-      .select('id, member_id, course, overall_status, status, member:family_members!student_profiles_member_id_fkey(display_name), university:universities(name)')
+      .select('id, member_id, course, overall_status, status, member:family_members!student_profiles_member_id_fkey(display_name, avatar_path), university:universities(name)')
       .eq('family_id', familyId);
 
     const rows = (data ?? []) as unknown as StudentRow[];
@@ -125,6 +125,7 @@ async function enrichStudent(
     id: r.id,
     memberId: r.member_id,
     name,
+    avatarUrl: await signMedia(r.member?.avatar_path),
     university: r.university?.name ?? '—',
     academicYear: year ? `Year ${year.study_year ?? '?'} · ${year.label}` : 'Not enrolled',
     funding: funding?.label ?? 'No funding set',

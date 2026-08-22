@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { GraduationCap, CalendarClock, Plane, Wallet, CircleDot } from 'lucide-react';
+import { GraduationCap, CalendarClock, Plane, Wallet, CircleDot, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Avatar } from '@/components/ui/avatar';
@@ -9,44 +9,43 @@ import type { StudentSummary } from '@/lib/types';
 export function StudentCard({ student }: { student: StudentSummary }) {
   const fundingTone = student.fundingKind === 'government_scholarship' ? 'success' : 'brand';
   return (
-    <Card className="overflow-hidden">
-      <div className="flex items-center gap-3 bg-navy px-5 py-4 text-white">
-        <Avatar name={student.name} size="lg" className="ring-2 ring-white/30" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-bold">{student.name}</p>
-          <p className="flex items-center gap-1 text-sm text-white/80">
-            <GraduationCap className="size-4" /> {student.university}
-          </p>
-        </div>
-        <Chip tone="navy" className="bg-white/15">{student.academicYear.split(' · ')[0]}</Chip>
-      </div>
-
-      <div className="space-y-3 p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <Chip tone={fundingTone}>{student.funding}</Chip>
-          <Chip tone="success"><CircleDot className="size-3" /> {student.overallStatus}</Chip>
+    <Link href={`/students/${student.id}`} className="group block" aria-label={`Open ${student.name}'s profile`}>
+      <Card className="overflow-hidden transition-shadow hover:shadow-card-hover">
+        <div className="flex items-center gap-3 bg-navy px-5 py-4 text-white">
+          <Avatar name={student.name} src={student.avatarUrl} size="lg" className="ring-2 ring-white/30" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-bold">{student.name}</p>
+            <p className="flex items-center gap-1 text-sm text-white/80">
+              <GraduationCap className="size-4" /> {student.university}
+            </p>
+          </div>
+          <Chip tone="navy" className="bg-white/15">{student.academicYear.split(' · ')[0]}</Chip>
         </div>
 
-        <dl className="divide-y divide-border rounded-xl border border-border">
-          <Row icon={<CalendarClock className="size-4 text-attention" />} label="Next task"
-               value={student.nextTask ? student.nextTask.title : 'Nothing due'}
-               meta={student.nextTask?.due} />
-          <Row icon={<Wallet className="size-4 text-brand" />} label="Next payment"
-               value={student.nextPayment ? student.nextPayment.label : 'None upcoming'}
-               meta={student.nextPayment ? formatMoney(student.nextPayment.amount, student.nextPayment.currency) : undefined} />
-          <Row icon={<Plane className="size-4 text-navy-500" />} label="Next trip"
-               value={student.nextTrip ? student.nextTrip.label : 'No trips planned'}
-               meta={student.nextTrip?.date} />
-        </dl>
+        <div className="space-y-3 p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip tone={fundingTone}>{student.funding}</Chip>
+            <Chip tone="success"><CircleDot className="size-3" /> {student.overallStatus}</Chip>
+          </div>
 
-        <Link
-          href={`/students/${student.id}`}
-          className="block rounded-xl bg-muted py-2.5 text-center text-sm font-semibold text-navy hover:bg-accent"
-        >
-          View {student.name}&apos;s profile
-        </Link>
-      </div>
-    </Card>
+          <dl className="divide-y divide-border rounded-xl border border-border">
+            <Row icon={<CalendarClock className="size-4 text-attention" />} label="Next task"
+                 value={student.nextTask ? student.nextTask.title : 'Nothing due'}
+                 meta={student.nextTask?.due} />
+            <Row icon={<Wallet className="size-4 text-brand" />} label="Next payment"
+                 value={student.nextPayment ? student.nextPayment.label : 'None upcoming'}
+                 meta={student.nextPayment ? formatMoney(student.nextPayment.amount, student.nextPayment.currency) : undefined} />
+            <Row icon={<Plane className="size-4 text-navy-500" />} label="Next trip"
+                 value={student.nextTrip ? student.nextTrip.label : 'No trips planned'}
+                 meta={student.nextTrip?.date} />
+          </dl>
+
+          <span className="flex items-center justify-center gap-1 rounded-xl bg-muted py-2.5 text-center text-sm font-semibold text-navy transition-colors group-hover:bg-accent">
+            View {student.name}&apos;s profile <ChevronRight className="size-4" />
+          </span>
+        </div>
+      </Card>
+    </Link>
   );
 }
 

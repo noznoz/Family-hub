@@ -57,7 +57,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
       <Card className="overflow-hidden">
         <div className="bg-navy p-5 text-white">
           <div className="flex items-start gap-4">
-            <Avatar name={student.name} size="lg" className="ring-2 ring-white/30" />
+            <Avatar name={student.name} src={student.avatarUrl} size="lg" className="ring-2 ring-white/30" />
             <div className="min-w-0 flex-1">
               <p className="text-xl font-bold">{student.name}</p>
               <p className="flex items-center gap-1 text-sm text-white/80">

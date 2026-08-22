@@ -174,7 +174,18 @@ export function MoneyView({
             {expenses.map((e) => (
               <div key={e.id} className="flex items-center gap-3 p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-navy">{e.description || e.category}</p>
+                  {canManage ? (
+                    <MoneyFormDialog
+                      live={live} students={students} familyId={familyId} mode="expense" editExpense={e}
+                      trigger={
+                        <button type="button" aria-label={`Edit ${e.description || e.category}`} className="block w-full text-left font-semibold text-navy hover:text-brand">
+                          {e.description || e.category}
+                        </button>
+                      }
+                    />
+                  ) : (
+                    <p className="font-semibold text-navy">{e.description || e.category}</p>
+                  )}
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
                     <Chip tone="navy">{e.student}</Chip>
                     <Chip tone="neutral">{e.category}</Chip>
@@ -197,14 +208,6 @@ export function MoneyView({
                 </div>
                 {canManage && (
                   <div className="flex shrink-0 items-center">
-                    <MoneyFormDialog
-                      live={live} students={students} familyId={familyId} mode="expense" editExpense={e}
-                      trigger={
-                        <button type="button" aria-label="Edit expense" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 transition-colors hover:bg-muted hover:text-navy">
-                          <Pencil className="size-4" />
-                        </button>
-                      }
-                    />
                     <DeleteButton
                       itemLabel="this expense" title="Delete expense"
                       onConfirm={() => (live ? deleteExpense(e.id) : Promise.resolve())}
@@ -226,10 +229,22 @@ export function MoneyView({
             {requests.map((r) => (
               <Card key={r.id} className="p-4">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-bold text-navy">{formatMoney(r.amount, r.currency)}{conv(r.amount, r.currency) && <span className="ml-1 text-[11px] font-normal text-muted-foreground">{conv(r.amount, r.currency)}</span>}</p>
-                    <p className="text-sm text-muted-foreground">{r.reason}</p>
-                  </div>
+                  {r.status === 'requested' && (canApprove || isStudent) ? (
+                    <MoneyFormDialog
+                      live={live} students={students} mode="request" editRequest={r}
+                      trigger={
+                        <button type="button" aria-label={`Edit request: ${r.reason}`} className="group min-w-0 text-left">
+                          <p className="font-bold text-navy group-hover:text-brand">{formatMoney(r.amount, r.currency)}{conv(r.amount, r.currency) && <span className="ml-1 text-[11px] font-normal text-muted-foreground">{conv(r.amount, r.currency)}</span>}</p>
+                          <p className="text-sm text-muted-foreground">{r.reason}</p>
+                        </button>
+                      }
+                    />
+                  ) : (
+                    <div className="min-w-0">
+                      <p className="font-bold text-navy">{formatMoney(r.amount, r.currency)}{conv(r.amount, r.currency) && <span className="ml-1 text-[11px] font-normal text-muted-foreground">{conv(r.amount, r.currency)}</span>}</p>
+                      <p className="text-sm text-muted-foreground">{r.reason}</p>
+                    </div>
+                  )}
                   <Chip tone={r.status === 'paid' ? 'success' : r.status === 'rejected' ? 'danger' : r.status === 'approved' ? 'brand' : 'attention'}>
                     {r.status}
                   </Chip>
@@ -244,14 +259,6 @@ export function MoneyView({
                   </span>
                   {r.status === 'requested' && (canApprove || isStudent) && (
                     <span className="flex items-center">
-                      <MoneyFormDialog
-                        live={live} students={students} mode="request" editRequest={r}
-                        trigger={
-                          <button type="button" aria-label="Edit request" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 transition-colors hover:bg-muted hover:text-navy">
-                            <Pencil className="size-4" />
-                          </button>
-                        }
-                      />
                       <DeleteButton
                         itemLabel="this request" title="Delete request"
                         onConfirm={() => (live ? deletePaymentRequest(r.id) : Promise.resolve())}

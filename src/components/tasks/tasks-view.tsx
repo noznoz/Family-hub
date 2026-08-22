@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { Plus, Check, Pencil, Paperclip } from 'lucide-react';
+import { Plus, Check, Paperclip } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
@@ -122,10 +122,22 @@ export function TasksView({
                 <Check className="size-4" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className={cn('font-semibold text-navy', t.status === 'done' && 'text-muted-foreground line-through')}>
-                  {t.title}
-                </p>
-                {t.description && <p className="text-sm text-muted-foreground">{t.description}</p>}
+                <TaskCreateDialog
+                  live={live}
+                  familyId={familyId}
+                  students={students}
+                  members={members}
+                  task={t}
+                  onSaved={onSaved}
+                  trigger={
+                    <button type="button" className="group block w-full text-left" aria-label={`Open ${t.title}`}>
+                      <p className={cn('font-semibold text-navy group-hover:text-brand', t.status === 'done' && 'text-muted-foreground line-through')}>
+                        {t.title}
+                      </p>
+                      {t.description && <p className="text-sm text-muted-foreground">{t.description}</p>}
+                    </button>
+                  }
+                />
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {t.student && <Chip tone="navy">{t.student}</Chip>}
                   {t.assignee && <Chip tone="neutral">{t.assignee}</Chip>}
@@ -155,19 +167,6 @@ export function TasksView({
                   live={live}
                   meId={meId}
                   members={members}
-                />
-                <TaskCreateDialog
-                  live={live}
-          familyId={familyId}
-                  students={students}
-                  members={members}
-                  task={t}
-                  onSaved={onSaved}
-                  trigger={
-                    <button type="button" aria-label="Edit task" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 transition-colors hover:bg-muted hover:text-navy">
-                      <Pencil className="size-4" />
-                    </button>
-                  }
                 />
                 <DeleteButton
                   itemLabel={`“${t.title}”`}
