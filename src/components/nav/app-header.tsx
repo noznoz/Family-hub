@@ -5,7 +5,7 @@ import { Bell, Search } from 'lucide-react';
 import { AppLogo } from '@/components/brand/app-logo';
 import { Avatar } from '@/components/ui/avatar';
 
-export function AppHeader({ name, notifUnread = 0 }: { name: string; notifUnread?: number }) {
+export function AppHeader({ name, avatarUrl, notifUnread = 0 }: { name: string; avatarUrl?: string | null; notifUnread?: number }) {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-white/90 px-4 py-3 backdrop-blur safe-top md:hidden">
       <Link href="/home" className="flex items-center gap-2">
@@ -25,7 +25,7 @@ export function AppHeader({ name, notifUnread = 0 }: { name: string; notifUnread
           )}
         </Link>
         <Link href="/profile" aria-label="Profile">
-          <Avatar name={name} size="sm" />
+          <Avatar name={name} src={avatarUrl} size="sm" />
         </Link>
       </div>
     </header>

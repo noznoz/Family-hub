@@ -45,7 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Sidebar locale={locale} chatUnread={unread.chat} />
       <div className="flex min-w-0 flex-1 flex-col">
         <OfflineIndicator />
-        <AppHeader name={session.member.displayName} notifUnread={unread.notifications} />
+        <AppHeader name={session.member.displayName} avatarUrl={session.member.avatarUrl} notifUnread={unread.notifications} />
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-24 pt-4 md:px-8 md:pb-10 md:pt-8">
           {children}
         </main>

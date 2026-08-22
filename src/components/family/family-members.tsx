@@ -14,13 +14,14 @@ import {
   setMemberEmail, updateMemberRole, setMemberStatus, setMemberRelationship,
   getMemberPermissions, setMemberPermission, deleteFamilyMember, type MemberPermissionRow,
 } from '@/lib/actions/family';
+import { AvatarUpload } from '@/components/profile/avatar-upload';
 import { PERMISSION_LABELS, type Permission } from '@/lib/permissions';
 import type { Member } from '@/lib/types';
 import type { SystemRole } from '@/lib/permissions';
 
 const roleTone = (m: Member) => (m.role === 'admin' ? 'navy' : m.role === 'parent' ? 'brand' : m.isStudent ? 'success' : 'neutral');
 
-export function FamilyMembers({ members, canManage, currentMemberId }: { members: Member[]; canManage: boolean; currentMemberId?: string }) {
+export function FamilyMembers({ members, canManage, currentMemberId, familyId }: { members: Member[]; canManage: boolean; currentMemberId?: string; familyId: string }) {
   const pending = members.filter((m) => m.status === 'invited');
   const active = members.filter((m) => m.status !== 'invited');
 
@@ -36,7 +37,7 @@ export function FamilyMembers({ members, canManage, currentMemberId }: { members
       <div className="grid gap-3 sm:grid-cols-2">
         {active.map((m) => (
           <Card key={m.id} className="flex items-center gap-3 p-4">
-            <Avatar name={m.displayName} size="lg" />
+            <Avatar name={m.displayName} src={m.avatarUrl} size="lg" />
             <div className="min-w-0 flex-1">
               <p className="font-bold text-navy">{m.displayName}</p>
               <p className="text-sm capitalize text-muted-foreground">{m.relationship}</p>
@@ -48,7 +49,7 @@ export function FamilyMembers({ members, canManage, currentMemberId }: { members
             </div>
             {canManage && (
               <div className="flex flex-col gap-1">
-                <ManageDialog member={m} isSelf={m.id === currentMemberId} />
+                <ManageDialog member={m} isSelf={m.id === currentMemberId} familyId={familyId} />
                 <PermissionsDialog member={m} />
               </div>
             )}
@@ -149,7 +150,7 @@ function PermissionsDialog({ member }: { member: Member }) {
   );
 }
 
-function ManageDialog({ member, isSelf }: { member: Member; isSelf: boolean }) {
+function ManageDialog({ member, isSelf, familyId }: { member: Member; isSelf: boolean; familyId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -192,6 +193,15 @@ function ManageDialog({ member, isSelf }: { member: Member; isSelf: boolean }) {
         </button>
       </DialogTrigger>
       <DialogContent title={`Manage ${member.displayName}`}>
+        <div className="mb-4 flex justify-center border-b border-border pb-4">
+          <AvatarUpload
+            memberId={member.id}
+            familyId={familyId}
+            name={member.displayName}
+            currentUrl={member.avatarUrl}
+            admin
+          />
+        </div>
         <form action={onSubmit} className="space-y-3">
           <Field label="Login email" htmlFor="email">
             <Input id="email" name="email" type="email" defaultValue={member.inviteEmail ?? ''} placeholder="name@example.com" />

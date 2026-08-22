@@ -1,5 +1,6 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
+import { env } from '@/lib/env';
 
 function one<T>(rel: unknown): T | null {
   if (!rel) return null;
@@ -15,6 +16,7 @@ export interface MyProfile {
   relationship: string | null;
   email: string | null;
   phone: string | null;
+  avatarUrl: string | null;
   familyName: string | null;
   memberSince: string | null;
   student: { university: string; course: string } | null;
@@ -29,10 +31,19 @@ export async function getMyProfile(memberId: string): Promise<MyProfile | null> 
 
   const { data: member } = await supabase
     .from('family_members')
-    .select('id, display_name, role, is_student, invite_email, created_at, family:families(name), relationships:family_relationships!family_relationships_member_id_fkey(relationship)')
+    .select('id, display_name, role, is_student, invite_email, avatar_path, created_at, family:families(name), relationships:family_relationships!family_relationships_member_id_fkey(relationship)')
     .eq('id', memberId)
     .maybeSingle();
   if (!member) return null;
+
+  let avatarUrl: string | null = null;
+  const avatarPath = (member as { avatar_path?: string | null }).avatar_path;
+  if (avatarPath) {
+    const { data: signed } = await supabase.storage
+      .from(env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET)
+      .createSignedUrl(avatarPath, 3600);
+    avatarUrl = signed?.signedUrl ?? null;
+  }
 
   let email: string | null = user?.email ?? (member as { invite_email?: string | null }).invite_email ?? null;
   let phone: string | null = null;
@@ -61,6 +72,7 @@ export async function getMyProfile(memberId: string): Promise<MyProfile | null> 
       (member.relationships as { relationship: string }[] | null)?.[0]?.relationship?.replace(/_/g, ' ') ?? null,
     email,
     phone,
+    avatarUrl,
     familyName: one<{ name: string }>(member.family)?.name ?? null,
     memberSince: member.created_at
       ? new Date(member.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })

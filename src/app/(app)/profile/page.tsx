@@ -5,9 +5,9 @@ import { getSessionUser } from '@/lib/session';
 import { getMyProfile } from '@/lib/profile-queries';
 import { ROLE_DEFAULTS, PERMISSION_LABELS } from '@/lib/permissions';
 import { Card } from '@/components/ui/card';
-import { Avatar } from '@/components/ui/avatar';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
+import { AvatarUpload } from '@/components/profile/avatar-upload';
 import { EditProfileDialog } from '@/components/profile/edit-profile-dialog';
 import { signOut } from '../settings/actions';
 
@@ -29,7 +29,13 @@ export default async function ProfilePage() {
       {/* Identity */}
       <Card className="p-5">
         <div className="flex items-center gap-4">
-          <Avatar name={displayName} size="lg" />
+          <AvatarUpload
+            memberId={session.memberId}
+            familyId={session.familyId}
+            name={displayName}
+            currentUrl={p?.avatarUrl}
+            live={!session.isDemo}
+          />
           <div className="min-w-0 flex-1">
             <p className="truncate text-xl font-extrabold text-navy">{displayName}</p>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">

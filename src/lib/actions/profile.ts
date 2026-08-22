@@ -40,3 +40,22 @@ export async function updateMyProfile(input: ProfileInput): Promise<Result> {
   revalidatePath('/settings');
   return { ok: true };
 }
+
+/** Set (or clear, with null) the signed-in member's profile picture. */
+export async function updateMyAvatar(path: string | null): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const session = await getSessionUser();
+  if (!session) return { ok: false, error: 'Not signed in.' };
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+
+  const { error } = await supabase
+    .from('family_members')
+    .update({ avatar_path: path })
+    .eq('id', session.memberId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath('/profile');
+  revalidatePath('/family');
+  return { ok: true };
+}

@@ -163,6 +163,24 @@ export async function deleteFamilyMember(memberId: string): Promise<Result> {
   return { ok: true };
 }
 
+/** Set (or clear, with null) any member's profile picture. Requires manage. */
+export async function setMemberAvatar(memberId: string, path: string | null): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const guard = await requireManage();
+  if (!guard.ok) return guard;
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+  const { error } = await supabase
+    .from('family_members')
+    .update({ avatar_path: path })
+    .eq('id', memberId)
+    .eq('family_id', guard.familyId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/family');
+  revalidatePath('/profile');
+  return { ok: true };
+}
+
 export interface MemberPermissionRow { key: Permission; label: string; roleDefault: boolean; effective: boolean; override: boolean | null }
 
 /** Load a member's permissions: role default, current override, effective value. */

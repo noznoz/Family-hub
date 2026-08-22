@@ -1,7 +1,7 @@
 import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { isSupabaseConfigured } from '@/lib/env';
+import { isSupabaseConfigured, env } from '@/lib/env';
 import { demoMembers } from '@/lib/demo-data';
 import type { Permission, SystemRole } from '@/lib/permissions';
 import type { Member } from '@/lib/types';
@@ -45,7 +45,7 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
 
     // No profiles join here: it's unused in the shell and an embed error would
     // make the whole query fail (returning null → endless redirect to /welcome).
-    const cols = 'id, family_id, display_name, role, is_student, theme';
+    const cols = 'id, family_id, display_name, role, is_student, theme, avatar_path';
     let { data, error } = await supabase
       .from('family_members')
       .select(cols)
@@ -53,8 +53,8 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
       .eq('status', 'active')
       .maybeSingle();
 
-    // Insurance: if the `theme` column hasn't been migrated yet (42703), retry
-    // without it so appearance-personalization never bricks sign-in.
+    // Insurance: if the `theme`/`avatar_path` columns haven't been migrated yet
+    // (42703), retry without them so personalization never bricks sign-in.
     if (error?.code === '42703') {
       ({ data, error } = await supabase
         .from('family_members')
@@ -77,6 +77,16 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
       .eq('member_id', data.id);
     for (const p of perms ?? []) overrides[p.permission_key as Permission] = p.granted;
 
+    // Sign the profile picture (private bucket) for this request.
+    let avatarUrl: string | null = null;
+    const avatarPath = (data as { avatar_path?: string | null }).avatar_path;
+    if (avatarPath) {
+      const { data: signed } = await supabase.storage
+        .from(env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET)
+        .createSignedUrl(avatarPath, 3600);
+      avatarUrl = signed?.signedUrl ?? null;
+    }
+
     return {
       isDemo: false,
       familyId: data.family_id,
@@ -88,7 +98,7 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
         role: data.role as SystemRole,
         isStudent: data.is_student,
         theme: (data as { theme?: string | null }).theme ?? null,
-        avatarUrl: null,
+        avatarUrl,
       },
     };
   }
