@@ -15,6 +15,7 @@ import { Field, Select } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import {
   updateStudentAcademics, addAcademicYear, updateAcademicYear, deleteAcademicYear,
+  addAcademicTerm, deleteAcademicTerm,
 } from '@/lib/actions/journey';
 import type { UniversityView } from '@/lib/journey-queries';
 
@@ -28,6 +29,8 @@ export function UniversityManager({
   live: boolean;
   canManage: boolean;
 }) {
+  const router = useRouter();
+  const removeTerm = (id: string) => { if (live) { void deleteAcademicTerm(id).then(() => router.refresh()); } };
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-extrabold tracking-tight text-navy">University</h1>
@@ -70,18 +73,36 @@ export function UniversityManager({
               {s.years.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No years added yet.</p>
               ) : (
-                <div className="space-y-1.5">
+                <div className="space-y-2.5">
                   {s.years.map((y) => (
-                    <div key={y.id} className="flex items-center gap-2">
-                      <Chip tone={yearTone(y.status)}>Year {y.studyYear ?? '?'} · {y.label}</Chip>
-                      <span className="text-xs capitalize text-muted-foreground">{y.status}</span>
-                      {canManage && (
-                        <span className="ml-auto flex items-center">
-                          <YearDialog studentId={s.studentId} live={live} year={y}
-                            trigger={<button type="button" aria-label="Edit year" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>} />
-                          <DeleteButton itemLabel={`year ${y.label}`} title="Delete academic year"
-                            onConfirm={() => (live ? deleteAcademicYear(y.id) : Promise.resolve())} onDeleted={() => {}} />
-                        </span>
+                    <div key={y.id} className="rounded-xl border border-border p-2.5">
+                      <div className="flex items-center gap-2">
+                        <Chip tone={yearTone(y.status)}>Year {y.studyYear ?? '?'} · {y.label}</Chip>
+                        <span className="text-xs capitalize text-muted-foreground">{y.status}</span>
+                        {canManage && (
+                          <span className="ml-auto flex items-center">
+                            <YearDialog studentId={s.studentId} live={live} year={y}
+                              trigger={<button type="button" aria-label="Edit year" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>} />
+                            <DeleteButton itemLabel={`year ${y.label}`} title="Delete academic year"
+                              onConfirm={() => (live ? deleteAcademicYear(y.id) : Promise.resolve())} onDeleted={() => {}} />
+                          </span>
+                        )}
+                      </div>
+                      {(y.terms.length > 0 || canManage) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-1">
+                          {y.terms.map((t) => (
+                            <span key={t.id} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs text-navy">
+                              {t.name}{t.when && <span className="text-muted-foreground">· {t.when}</span>}
+                              {canManage && (
+                                <button type="button" aria-label="Delete term" onClick={() => removeTerm(t.id)} className="text-danger">×</button>
+                              )}
+                            </span>
+                          ))}
+                          {canManage && (
+                            <TermDialog yearId={y.id} live={live}
+                              trigger={<button type="button" className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-xs font-semibold text-brand"><Plus className="size-3" /> Term</button>} />
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}
@@ -182,6 +203,47 @@ function YearDialog({
           <div className="flex gap-2 pt-1">
             <DialogClose asChild><Button type="button" variant="outline" className="flex-1">Cancel</Button></DialogClose>
             <Button type="submit" variant="brand" className="flex-1" disabled={pending}>{pending ? 'Saving…' : isEdit ? 'Save' : 'Add year'}</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TermDialog({ yearId, live, trigger }: { yearId: string; live: boolean; trigger: React.ReactNode }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const onSubmit = (fd: FormData) => {
+    const name = String(fd.get('name') ?? '').trim();
+    if (!name) return setError('Term name is required.');
+    setError(null);
+    startTransition(async () => {
+      const res = live ? await addAcademicTerm({
+        academicYearId: yearId, name,
+        startDate: String(fd.get('startDate') ?? '') || null,
+        endDate: String(fd.get('endDate') ?? '') || null,
+      }) : { ok: true as const };
+      if (!res.ok) return setError(res.error);
+      setOpen(false); router.refresh();
+    });
+  };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent title="Add term">
+        <form action={onSubmit} className="space-y-3">
+          <Field label="Term name" htmlFor="name"><Input id="name" name="name" required placeholder="e.g. Autumn Term" /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Start" htmlFor="startDate"><Input id="startDate" name="startDate" type="date" /></Field>
+            <Field label="End" htmlFor="endDate"><Input id="endDate" name="endDate" type="date" /></Field>
+          </div>
+          {!live && <p className="rounded-lg bg-brand-muted px-3 py-2 text-xs text-navy">Demo mode — not saved.</p>}
+          {error && <p className="text-sm font-medium text-danger">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <DialogClose asChild><Button type="button" variant="outline" className="flex-1">Cancel</Button></DialogClose>
+            <Button type="submit" variant="brand" className="flex-1" disabled={pending}>{pending ? 'Saving…' : 'Add term'}</Button>
           </div>
         </form>
       </DialogContent>

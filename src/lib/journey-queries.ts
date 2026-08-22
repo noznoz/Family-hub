@@ -124,14 +124,14 @@ export async function getAccommodations(familyId: string): Promise<Accommodation
 // ── University ────────────────────────────────────────────────────────────
 export interface UniversityView {
   studentId: string; name: string; university: string; course: string; ref: string;
-  years: { id: string; label: string; studyYear: number | null; status: string }[];
+  years: { id: string; label: string; studyYear: number | null; status: string; terms: { id: string; name: string; when: string }[] }[];
 }
 export async function getUniversityInfo(familyId: string): Promise<UniversityView[]> {
   const supabase = await createClient();
   if (!supabase) return [];
   const { data } = await supabase
     .from('student_profiles')
-    .select('id, course, student_ref, member:family_members!student_profiles_member_id_fkey(display_name), university:universities(name), years:academic_years(id, label, study_year, status)')
+    .select('id, course, student_ref, member:family_members!student_profiles_member_id_fkey(display_name), university:universities(name), years:academic_years(id, label, study_year, status, terms:academic_terms(id, name, start_date, end_date))')
     .eq('family_id', familyId);
   return (data ?? []).map((s) => ({
     studentId: s.id,
@@ -139,9 +139,15 @@ export async function getUniversityInfo(familyId: string): Promise<UniversityVie
     university: one<{ name: string }>(s.university)?.name ?? '—',
     course: s.course ?? '—',
     ref: s.student_ref ?? '—',
-    years: (((s.years as { id: string; label: string; study_year: number | null; status: string }[]) ?? [])
+    years: (((s.years as { id: string; label: string; study_year: number | null; status: string; terms?: { id: string; name: string; start_date: string | null; end_date: string | null }[] }[]) ?? [])
       .sort((a, b) => (a.study_year ?? 0) - (b.study_year ?? 0))
-      .map((y) => ({ id: y.id, label: y.label, studyYear: y.study_year, status: y.status }))),
+      .map((y) => ({
+        id: y.id, label: y.label, studyYear: y.study_year, status: y.status,
+        terms: (y.terms ?? []).map((t) => ({
+          id: t.id, name: t.name,
+          when: [t.start_date ? fmtDate(t.start_date) : null, t.end_date ? fmtDate(t.end_date) : null].filter(Boolean).join(' → '),
+        })),
+      }))),
   }));
 }
 
