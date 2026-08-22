@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, Flag } from 'lucide-react';
+import { Plus, Flag } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DeleteButton } from '@/components/ui/delete-button';
@@ -37,14 +37,24 @@ export function MilestonesManager({
             <div key={m.id} className="flex items-center gap-3 p-4">
               <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-muted text-brand"><Flag className="size-4" /></span>
               <div className="min-w-0 flex-1">
-                <p className="font-medium text-navy">{m.title}</p>
-                {m.description && <p className="text-xs text-muted-foreground">{m.description}</p>}
+                {canManage ? (
+                  <MilestoneDialog studentId={studentId} live={live} milestone={m}
+                    trigger={
+                      <button type="button" aria-label={`Edit ${m.title}`} className="block w-full text-left">
+                        <p className="font-medium text-navy hover:text-brand">{m.title}</p>
+                        {m.description && <p className="text-xs text-muted-foreground">{m.description}</p>}
+                      </button>
+                    } />
+                ) : (
+                  <>
+                    <p className="font-medium text-navy">{m.title}</p>
+                    {m.description && <p className="text-xs text-muted-foreground">{m.description}</p>}
+                  </>
+                )}
               </div>
               {m.occurred_on && <span className="shrink-0 text-xs text-muted-foreground">{m.occurred_on}</span>}
               {canManage && (
                 <span className="flex shrink-0 items-center">
-                  <MilestoneDialog studentId={studentId} live={live} milestone={m}
-                    trigger={<button type="button" aria-label="Edit milestone" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>} />
                   <DeleteButton itemLabel={`“${m.title}”`} title="Delete milestone"
                     onConfirm={() => (live ? deleteMilestone(m.id, studentId) : Promise.resolve())} onDeleted={() => router.refresh()} />
                 </span>

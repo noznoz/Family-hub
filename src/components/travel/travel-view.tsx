@@ -1,6 +1,6 @@
 'use client';
 
-import { Plane, Users, Plus, Pencil, Ticket } from 'lucide-react';
+import { Plane, Users, Plus, Ticket } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
@@ -34,7 +34,14 @@ export function TravelView({
         <Card key={t.id} className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-bold text-navy">{t.title}</p>
+              {canManage ? (
+                <TripFormDialog
+                  live={live} members={members} trip={t}
+                  trigger={<button type="button" aria-label={`Edit ${t.title}`} className="block text-left font-bold text-navy hover:text-brand">{t.title}</button>}
+                />
+              ) : (
+                <p className="font-bold text-navy">{t.title}</p>
+              )}
               <p className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Plane className="size-4" /> {t.origin || '—'} → {t.destination || '—'}
               </p>
@@ -56,14 +63,8 @@ export function TravelView({
                 <ShareButton text={`✈️ Trip: ${t.title}\n${t.origin || '—'} → ${t.destination || '—'}\n🗓 ${t.departLabel}${t.travelers.length ? `\n👥 ${t.travelers.join(', ')}` : ''}`} url="/travel" />
                 <ReminderButton entityType="trip" entityId={t.id} title={t.title} link="/travel" live={live} meId={meId} members={members} />
                 {canManage && (
-                  <>
-                    <TripFormDialog
-                      live={live} members={members} trip={t}
-                      trigger={<button type="button" aria-label="Edit trip" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>}
-                    />
-                    <DeleteButton itemLabel={`“${t.title}”`} title="Delete trip"
-                      onConfirm={() => (live ? deleteTrip(t.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
-                  </>
+                  <DeleteButton itemLabel={`“${t.title}”`} title="Delete trip"
+                    onConfirm={() => (live ? deleteTrip(t.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
                 )}
               </div>
             </div>

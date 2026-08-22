@@ -54,7 +54,11 @@ export default async function DocumentsPage() {
             <div key={d.id} className="flex items-center gap-3 p-4">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-navy"><FileText className="size-5" /></span>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-navy">{d.name}</p>
+                {d.url ? (
+                  <a href={d.url} target="_blank" rel="noopener noreferrer" className="block truncate font-semibold text-navy hover:text-brand">{d.name}</a>
+                ) : (
+                  <p className="truncate font-semibold text-navy">{d.name}</p>
+                )}
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   <Chip tone="neutral" className="capitalize">{d.category}</Chip>
                   {d.student && <Chip tone="navy">{d.student}</Chip>}

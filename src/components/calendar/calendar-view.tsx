@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar as CalIcon, Plus, Pencil, ChevronLeft, ChevronRight, Download, List, Grid3x3 } from 'lucide-react';
+import { Calendar as CalIcon, Plus, ChevronLeft, ChevronRight, Download, List, Grid3x3 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
@@ -99,7 +99,12 @@ export function CalendarView({
             <div key={e.id} className="flex items-center gap-3 p-4">
               <div className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl bg-muted text-navy"><CalIcon className="size-5" /></div>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-navy">{e.title}</p>
+                {canManage && !e.derived ? (
+                  <EventFormDialog live={live} students={students} event={e}
+                    trigger={<button type="button" aria-label={`Edit ${e.title}`} className="block w-full text-left font-semibold text-navy hover:text-brand">{e.title}</button>} />
+                ) : (
+                  <p className="font-semibold text-navy">{e.title}</p>
+                )}
                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                   <Chip tone={kindTone[e.kind] ?? 'neutral'} className="capitalize">{e.kind.replace(/_/g, ' ')}</Chip>
                   {e.student && <Chip tone="navy">{e.student}</Chip>}
@@ -111,12 +116,8 @@ export function CalendarView({
                 <ShareButton text={`📅 ${e.title}\n${e.whenRaw}${e.student ? ` · ${e.student}` : ''}`} url="/calendar" />
                 <ReminderButton entityType="calendar_event" entityId={e.id} title={e.title} link="/calendar" live={live} meId={meId} />
                 {canManage && !e.derived && (
-                  <>
-                    <EventFormDialog live={live} students={students} event={e}
-                      trigger={<button type="button" aria-label="Edit event" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>} />
-                    <DeleteButton itemLabel={`“${e.title}”`} title="Delete event"
-                      onConfirm={() => (live ? deleteCalendarEvent(e.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
-                  </>
+                  <DeleteButton itemLabel={`“${e.title}”`} title="Delete event"
+                    onConfirm={() => (live ? deleteCalendarEvent(e.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
                 )}
               </div>
             </div>

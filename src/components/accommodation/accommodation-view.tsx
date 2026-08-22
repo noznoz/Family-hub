@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, MapPin, Plus, Pencil, Wifi, Wrench, Zap, FileText, ImagePlus, Loader2 } from 'lucide-react';
+import { Building2, MapPin, Plus, Wifi, Wrench, Zap, FileText, ImagePlus, Loader2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
@@ -41,18 +41,19 @@ export function AccommodationView({
         list.map((a) => (
           <Card key={a.id} className="p-4">
             <div className="flex items-start justify-between gap-2">
-              <p className="font-bold text-navy">{a.property}</p>
+              {canManage ? (
+                <AccommodationFormDialog live={live} students={students} familyId={familyId} item={a}
+                  trigger={<button type="button" aria-label={`Edit ${a.property}`} className="min-w-0 text-left font-bold text-navy hover:text-brand">{a.property}</button>} />
+              ) : (
+                <p className="font-bold text-navy">{a.property}</p>
+              )}
               <div className="flex items-center gap-1">
                 {a.current ? <Chip tone="success">Current</Chip> : <Chip tone="neutral">Past</Chip>}
                 <ShareButton text={`🏠 ${a.property}${a.address ? `\n${a.address}` : ''}\n💷 ${a.rent}${a.student ? ` · ${a.student}` : ''}\n${a.start} → ${a.end}`} url="/accommodation" />
                 <ReminderButton entityType="accommodation" entityId={a.id} title={a.property} link="/accommodation" live={live} meId={meId} />
                 {canManage && (
-                  <>
-                    <AccommodationFormDialog live={live} students={students} familyId={familyId} item={a}
-                      trigger={<button type="button" aria-label="Edit accommodation" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>} />
-                    <DeleteButton itemLabel={`“${a.property}”`} title="Delete accommodation"
-                      onConfirm={() => (live ? deleteAccommodation(a.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
-                  </>
+                  <DeleteButton itemLabel={`“${a.property}”`} title="Delete accommodation"
+                    onConfirm={() => (live ? deleteAccommodation(a.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
                 )}
               </div>
             </div>

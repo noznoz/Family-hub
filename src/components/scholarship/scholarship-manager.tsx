@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Award, Check, Circle, Plus, Pencil } from 'lucide-react';
+import { Award, Check, Circle, Plus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Button } from '@/components/ui/button';
@@ -48,16 +48,17 @@ export function ScholarshipManager({
           return (
             <Card key={s.studentId} className="p-5">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <p className="font-bold text-navy">{s.name}</p>
+                {canManage ? (
+                  <ScholarshipDialog student={s} live={live}
+                    trigger={<button type="button" aria-label={`Edit ${s.name}’s scholarship`} className="min-w-0 truncate text-left font-bold text-navy hover:text-brand">{s.name}</button>} />
+                ) : (
+                  <p className="font-bold text-navy">{s.name}</p>
+                )}
                 <div className="flex items-center gap-1">
                   <Chip tone={s.stage === 'active' ? 'success' : 'brand'} className="capitalize">{label(s.stage)}</Chip>
                   <ShareButton
                     text={`🎓 ${s.name} — Scholarship\nStage: ${label(s.stage)}${s.sponsor ? `\nSponsor: ${s.sponsor}` : ''}${s.funding.length ? `\nFunding: ${s.funding.map((f) => f.label).join(', ')}` : ''}`}
                     url="/scholarship" />
-                  {canManage && (
-                    <ScholarshipDialog student={s} live={live}
-                      trigger={<button type="button" aria-label="Edit scholarship" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>} />
-                  )}
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">Sponsor: {s.sponsor || '—'}</p>
@@ -91,15 +92,16 @@ export function ScholarshipManager({
                         <button type="button" aria-label={r.done ? 'Mark incomplete' : 'Mark complete'} onClick={() => canManage && toggle(r.id, !r.done)} className={canManage ? 'cursor-pointer' : 'cursor-default'}>
                           {r.done ? <Check className="size-4 text-success" /> : <Circle className="size-4 text-navy-200" />}
                         </button>
-                        <span className="flex-1 text-navy">{r.title}</span>
+                        {canManage ? (
+                          <RequirementDialog studentId={s.studentId} scholarshipId={s.scholarshipId} live={live} req={r}
+                            trigger={<button type="button" aria-label={`Edit ${r.title}`} className="flex-1 truncate text-left text-navy hover:text-brand">{r.title}</button>} />
+                        ) : (
+                          <span className="flex-1 text-navy">{r.title}</span>
+                        )}
                         <span className="text-xs text-muted-foreground">{r.due}</span>
                         {canManage && (
-                          <span className="flex items-center">
-                            <RequirementDialog studentId={s.studentId} scholarshipId={s.scholarshipId} live={live} req={r}
-                              trigger={<button type="button" aria-label="Edit requirement" className="inline-flex size-7 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-3.5" /></button>} />
-                            <DeleteButton itemLabel={`“${r.title}”`} title="Delete requirement"
-                              onConfirm={() => (live ? deleteRequirement(r.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
-                          </span>
+                          <DeleteButton itemLabel={`“${r.title}”`} title="Delete requirement"
+                            onConfirm={() => (live ? deleteRequirement(r.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
                         )}
                       </div>
                     ))}
@@ -122,16 +124,17 @@ export function ScholarshipManager({
                   <div className="space-y-1">
                     {s.funding.map((f) => (
                       <div key={f.id} className="flex items-center justify-between gap-2 text-sm">
-                        <span className="min-w-0 truncate text-navy">{f.label}</span>
+                        {canManage ? (
+                          <FundingDialog studentId={s.studentId} live={live} fund={f}
+                            trigger={<button type="button" aria-label={`Edit ${f.label}`} className="min-w-0 truncate text-left text-navy hover:text-brand">{f.label}</button>} />
+                        ) : (
+                          <span className="min-w-0 truncate text-navy">{f.label}</span>
+                        )}
                         <div className="flex shrink-0 items-center gap-1">
                           <span className="text-xs text-muted-foreground">{f.start} → {f.end}</span>
                           {canManage && (
-                            <>
-                              <FundingDialog studentId={s.studentId} live={live} fund={f}
-                                trigger={<button type="button" aria-label="Edit funding" className="inline-flex size-7 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-3.5" /></button>} />
-                              <DeleteButton itemLabel={`“${f.label}”`} title="Delete funding source"
-                                onConfirm={() => (live ? deleteFunding(f.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
-                            </>
+                            <DeleteButton itemLabel={`“${f.label}”`} title="Delete funding source"
+                              onConfirm={() => (live ? deleteFunding(f.id) : Promise.resolve())} onDeleted={() => router.refresh()} />
                           )}
                         </div>
                       </div>

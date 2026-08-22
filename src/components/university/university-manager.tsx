@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { GraduationCap, Plus, Pencil } from 'lucide-react';
+import { GraduationCap, Plus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Avatar } from '@/components/ui/avatar';
@@ -40,22 +40,26 @@ export function UniversityManager({
         students.map((s) => (
           <Card key={s.studentId} className="p-5">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <Avatar name={s.name} size="lg" />
-                <div>
-                  <p className="font-bold text-navy">{s.name}</p>
-                  <p className="text-sm text-muted-foreground">{s.university}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                <ShareButton
-                  text={`🎓 ${s.name}\n${s.university}${s.course !== '—' ? ` · ${s.course}` : ''}${s.ref !== '—' ? `\nStudent ID: ${s.ref}` : ''}${s.years.length ? `\n${s.years.map((y) => `Year ${y.studyYear ?? '?'} (${y.status})`).join(', ')}` : ''}`}
-                  url="/university" />
-                {canManage && (
+                {canManage ? (
                   <AcademicsDialog student={s} live={live}
-                    trigger={<Button variant="outline" size="sm"><Pencil className="size-4" /> Edit</Button>} />
+                    trigger={
+                      <button type="button" aria-label={`Edit ${s.name}`} className="min-w-0 text-left">
+                        <p className="truncate font-bold text-navy hover:text-brand">{s.name}</p>
+                        <p className="truncate text-sm text-muted-foreground">{s.university}</p>
+                      </button>
+                    } />
+                ) : (
+                  <div className="min-w-0">
+                    <p className="truncate font-bold text-navy">{s.name}</p>
+                    <p className="truncate text-sm text-muted-foreground">{s.university}</p>
+                  </div>
                 )}
               </div>
+              <ShareButton
+                text={`🎓 ${s.name}\n${s.university}${s.course !== '—' ? ` · ${s.course}` : ''}${s.ref !== '—' ? `\nStudent ID: ${s.ref}` : ''}${s.years.length ? `\n${s.years.map((y) => `Year ${y.studyYear ?? '?'} (${y.status})`).join(', ')}` : ''}`}
+                url="/university" />
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
               <div><p className="text-xs font-semibold uppercase text-muted-foreground">Course</p><p className="text-navy">{s.course}</p></div>
@@ -77,12 +81,22 @@ export function UniversityManager({
                   {s.years.map((y) => (
                     <div key={y.id} className="rounded-xl border border-border p-2.5">
                       <div className="flex items-center gap-2">
-                        <Chip tone={yearTone(y.status)}>Year {y.studyYear ?? '?'} · {y.label}</Chip>
-                        <span className="text-xs capitalize text-muted-foreground">{y.status}</span>
+                        {canManage ? (
+                          <YearDialog studentId={s.studentId} live={live} year={y}
+                            trigger={
+                              <button type="button" aria-label={`Edit year ${y.label}`} className="group flex items-center gap-2 text-left">
+                                <Chip tone={yearTone(y.status)}>Year {y.studyYear ?? '?'} · {y.label}</Chip>
+                                <span className="text-xs capitalize text-muted-foreground group-hover:text-brand">{y.status}</span>
+                              </button>
+                            } />
+                        ) : (
+                          <>
+                            <Chip tone={yearTone(y.status)}>Year {y.studyYear ?? '?'} · {y.label}</Chip>
+                            <span className="text-xs capitalize text-muted-foreground">{y.status}</span>
+                          </>
+                        )}
                         {canManage && (
                           <span className="ml-auto flex items-center">
-                            <YearDialog studentId={s.studentId} live={live} year={y}
-                              trigger={<button type="button" aria-label="Edit year" className="inline-flex size-8 items-center justify-center rounded-lg text-navy-400 hover:bg-muted hover:text-navy"><Pencil className="size-4" /></button>} />
                             <DeleteButton itemLabel={`year ${y.label}`} title="Delete academic year"
                               onConfirm={() => (live ? deleteAcademicYear(y.id) : Promise.resolve())} onDeleted={() => {}} />
                           </span>
