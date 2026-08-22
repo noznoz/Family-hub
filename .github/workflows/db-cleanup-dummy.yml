@@ -1,0 +1,32 @@
+name: DB cleanup dummy data
+on:
+  push:
+    branches: ['claude/family-hub-pwa-build-j1eivv']
+    paths: ['.github/db-cleanup-dummy.trigger']
+  workflow_dispatch:
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Remove seed/demo data
+        env:
+          RAW_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$RAW_DB_URL" ]; then echo "::error::SUPABASE_DB_URL secret is not set."; exit 1; fi
+          DB_URL=$(printf '%s' "$RAW_DB_URL" | tr -d '\r\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/cleanup_dummy_data.sql
+          FAM="11111111-1111-1111-1111-111111111111"
+          TASKS=$(psql "$DB_URL" -tA -c "select count(*) from public.tasks where family_id='$FAM';")
+          if [ "$TASKS" != "0" ]; then echo "::error::sample tasks still present ($TASKS)."; exit 1; fi
+          RELATIVES=$(psql "$DB_URL" -tA -c "select count(*) from public.family_members where id in ('33333333-3333-3333-3333-333333333302','33333333-3333-3333-3333-333333333303','33333333-3333-3333-3333-333333333304','33333333-3333-3333-3333-333333333305');")
+          if [ "$RELATIVES" != "0" ]; then echo "::error::placeholder relatives still present ($RELATIVES)."; exit 1; fi
+          DAD=$(psql "$DB_URL" -tA -c "select count(*) from public.family_members where id='33333333-3333-3333-3333-333333333301';")
+          if [ "$DAD" != "1" ]; then echo "::error::admin (Dad) account missing after cleanup."; exit 1; fi
+          KIDS=$(psql "$DB_URL" -tA -c "select count(*) from public.family_members where id in ('33333333-3333-3333-3333-333333333306','33333333-3333-3333-3333-333333333307');")
+          if [ "$KIDS" != "2" ]; then echo "::error::student profiles missing after cleanup ($KIDS/2)."; exit 1; fi
+          PLACEHOLDER=$(psql "$DB_URL" -tA -c "select count(*) from public.family_members where family_id='$FAM' and invite_email ilike '%@example.com';")
+          if [ "$PLACEHOLDER" != "0" ]; then echo "::error::placeholder emails still present ($PLACEHOLDER)."; exit 1; fi
+          echo "Cleanup complete: sample data removed, real accounts preserved."
