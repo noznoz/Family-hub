@@ -49,6 +49,7 @@ export interface Task {
   assigneeId?: string | null;
   repeat?: string | null;
   attachmentUrl?: string | null;
+  subtasks?: { id: string; title: string; status: TaskStatus }[];
 }
 
 export interface Message {

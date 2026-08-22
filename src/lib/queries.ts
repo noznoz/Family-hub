@@ -140,11 +140,19 @@ export async function getTasks(familyId: string): Promise<Task[]> {
   if (!supabase) return [];
   const { data } = await supabase
     .from('tasks')
-    .select('id, title, description, priority, status, due_date, assignee_id, student_id, attachment_url, assignee:family_members!tasks_assignee_id_fkey(display_name), student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), recurrence:task_recurrences(frequency, active)')
+    .select('id, title, description, priority, status, due_date, assignee_id, student_id, parent_task_id, attachment_url, assignee:family_members!tasks_assignee_id_fkey(display_name), student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), recurrence:task_recurrences(frequency, active)')
     .eq('family_id', familyId)
     .order('due_date', { ascending: true });
 
-  return Promise.all((data ?? []).map(async (t) => {
+  // Group subtasks under their parent.
+  const rows = data ?? [];
+  const subById = new Map<string, { id: string; title: string; status: TaskStatus }[]>();
+  for (const t of rows) {
+    const pid = (t as { parent_task_id?: string | null }).parent_task_id;
+    if (pid) subById.set(pid, [...(subById.get(pid) ?? []), { id: t.id, title: t.title, status: t.status as TaskStatus }]);
+  }
+
+  return Promise.all(rows.filter((t) => !(t as { parent_task_id?: string | null }).parent_task_id).map(async (t) => {
     const studentName = one<{ member: { display_name: string } | null }>(t.student)?.member?.display_name;
     const rec = ((t as { recurrence?: { frequency: string; active: boolean }[] }).recurrence ?? []).find((r) => r.active);
     return {
@@ -161,6 +169,7 @@ export async function getTasks(familyId: string): Promise<Task[]> {
       assigneeId: (t as { assignee_id?: string | null }).assignee_id ?? null,
       repeat: rec?.frequency ?? 'none',
       attachmentUrl: await signMedia((t as { attachment_url?: string | null }).attachment_url),
+      subtasks: subById.get(t.id) ?? [],
     };
   }));
 }

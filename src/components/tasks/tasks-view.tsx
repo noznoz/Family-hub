@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { setTaskStatus, deleteTask } from '@/lib/actions/tasks';
 import { TaskCreateDialog } from './task-create-dialog';
 import { TaskCommentsDialog } from './task-comments-dialog';
+import { TaskSubtasks } from './task-subtasks';
 import type { Task, TaskPriority, TaskStatus } from '@/lib/types';
 
 const FILTERS = ['My Tasks', 'Hamza', 'Omar', 'Family', 'Completed'] as const;
@@ -138,6 +139,7 @@ export function TasksView({
                     </a>
                   )}
                 </div>
+                {t.status !== 'done' && <TaskSubtasks parentId={t.id} subtasks={t.subtasks ?? []} live={live} />}
               </div>
               <div className="flex shrink-0 items-center">
                 <TaskCommentsDialog taskId={t.id} title={t.title} live={live} />

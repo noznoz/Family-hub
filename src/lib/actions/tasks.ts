@@ -181,6 +181,24 @@ export async function setTaskStatus(id: string, status: TaskStatus): Promise<Res
   return { ok: true };
 }
 
+/** Add a subtask under a parent task. */
+export async function addSubtask(parentId: string, title: string): Promise<Result> {
+  if (!title.trim()) return { ok: false, error: 'Title is required.' };
+  if (!isSupabaseConfigured) return { ok: true };
+  const session = await getSessionUser();
+  if (!session) return { ok: false, error: 'Not signed in.' };
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase.from('tasks').insert({
+    family_id: session.familyId, title: title.trim(), priority: 'normal', status: 'todo',
+    parent_task_id: parentId, created_by: user?.id ?? null,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath('/tasks');
+  return { ok: true };
+}
+
 export interface TaskComment { id: string; author: string; body: string; when: string }
 
 export async function listTaskComments(taskId: string): Promise<TaskComment[]> {
