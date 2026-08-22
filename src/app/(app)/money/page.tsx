@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import { Lock } from 'lucide-react';
 import { getSessionUser } from '@/lib/session';
 import { can } from '@/lib/permissions';
+import { cookies } from 'next/headers';
 import { getExpenses, getPaymentRequests, getStudents, getBudgets, type BudgetSnapshot } from '@/lib/queries';
+import { getFx, resolveCurrency, CURRENCY_COOKIE } from '@/lib/fx';
 import { demoBudgets, demoExpenses, demoRequests, demoStudents } from '@/lib/demo-data';
 import { MoneyView } from '@/components/money/money-view';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -51,12 +53,16 @@ export default async function MoneyPage() {
       ]);
 
   const shownBudgets = onlyStudent ? budgets.filter((b) => b.name === onlyStudent) : budgets;
+  const displayCurrency = resolveCurrency((await cookies()).get(CURRENCY_COOKIE)?.value);
+  const fx = await getFx();
 
   return (
     <MoneyView
       live={!session.isDemo}
       meId={session.memberId}
       familyId={session.familyId}
+      displayCurrency={displayCurrency}
+      fxRates={fx.rates}
       budgets={shownBudgets}
       expenses={expenses}
       requests={requests}

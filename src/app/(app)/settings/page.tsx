@@ -10,6 +10,7 @@ import { ROLE_DEFAULTS } from '@/lib/permissions';
 import { EnableNotifications } from '@/components/pwa/enable-notifications';
 import { ThemePicker } from '@/components/settings/theme-picker';
 import { LanguagePicker } from '@/components/settings/language-picker';
+import { CurrencyPicker } from '@/components/settings/currency-picker';
 import { resolveTheme } from '@/lib/theme';
 import { signOut } from './actions';
 
@@ -43,6 +44,8 @@ export default async function SettingsPage() {
         <ThemePicker initial={resolveTheme(member.theme)} />
         <p className="mb-2 mt-4 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Language</p>
         <LanguagePicker />
+        <p className="mb-2 mt-4 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Display currency</p>
+        <CurrencyPicker />
       </div>
 
       <div>

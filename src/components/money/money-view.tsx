@@ -34,12 +34,23 @@ function exportExpensesCsv(expenses: Expense[]) {
 const TABS = ['Overview', 'Expenses', 'Requests'] as const;
 type Tab = (typeof TABS)[number];
 
+/** Convert using GBP-based rates (matches lib/fx convert). */
+function fxConvert(amount: number, from: string, to: string, rates: Record<string, number>): number {
+  if (from === to) return amount;
+  const rFrom = from === 'GBP' ? 1 : rates[from];
+  const rTo = to === 'GBP' ? 1 : rates[to];
+  if (!rFrom || !rTo) return amount;
+  return (amount / rFrom) * rTo;
+}
+
 export function MoneyView({
-  live, meId, familyId, budgets, expenses, requests, students, onlyStudent, canManage, canApprove, isStudent,
+  live, meId, familyId, displayCurrency, fxRates, budgets, expenses, requests, students, onlyStudent, canManage, canApprove, isStudent,
 }: {
   live: boolean;
   meId: string;
   familyId: string;
+  displayCurrency: string;
+  fxRates: Record<string, number>;
   budgets: BudgetSnapshot[];
   expenses: Expense[];
   requests: PaymentRequest[];
@@ -53,6 +64,8 @@ export function MoneyView({
   const [tab, setTab] = useState<Tab>('Overview');
   const [pending, startTransition] = useTransition();
   const act = (fn: () => Promise<unknown>) => startTransition(async () => { await fn(); router.refresh(); });
+  const conv = (amount: number, currency: string) =>
+    currency === displayCurrency ? null : `≈ ${formatMoney(fxConvert(amount, currency, displayCurrency, fxRates), displayCurrency)}`;
 
   return (
     <div className="space-y-4">
@@ -97,6 +110,15 @@ export function MoneyView({
       </div>
 
       {tab === 'Overview' && (
+        <div className="space-y-3">
+        {expenses.length > 0 && (
+          <Card className="flex items-center justify-between p-4">
+            <span className="text-sm font-semibold text-muted-foreground">Total spent (this list)</span>
+            <span className="text-lg font-extrabold text-navy">
+              {formatMoney(expenses.reduce((s, e) => s + fxConvert(e.amount, e.currency, displayCurrency, fxRates), 0), displayCurrency)}
+            </span>
+          </Card>
+        )}
         <div className="grid gap-3 md:grid-cols-2">
           {budgets.map((b) => {
             const hasBudget = b.budget > 0;
@@ -141,6 +163,7 @@ export function MoneyView({
             );
           })}
         </div>
+        </div>
       )}
 
       {tab === 'Expenses' && (
@@ -164,7 +187,10 @@ export function MoneyView({
                     )}
                   </div>
                 </div>
-                <span className="shrink-0 font-bold text-navy">{formatMoney(e.amount, e.currency)}</span>
+                <span className="shrink-0 text-right">
+                  <span className="block font-bold text-navy">{formatMoney(e.amount, e.currency)}</span>
+                  {conv(e.amount, e.currency) && <span className="block text-[11px] text-muted-foreground">{conv(e.amount, e.currency)}</span>}
+                </span>
                 <div className="flex shrink-0 items-center">
                   <ShareButton text={`💷 Expense: ${e.description || e.category} — ${formatMoney(e.amount, e.currency)} (${e.category}, ${e.student})`} url="/money" />
                   <ReminderButton entityType="expense" entityId={e.id} title={e.description || e.category} link="/money" live={live} meId={meId} />
@@ -201,7 +227,7 @@ export function MoneyView({
               <Card key={r.id} className="p-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-bold text-navy">{formatMoney(r.amount, r.currency)}</p>
+                    <p className="font-bold text-navy">{formatMoney(r.amount, r.currency)}{conv(r.amount, r.currency) && <span className="ml-1 text-[11px] font-normal text-muted-foreground">{conv(r.amount, r.currency)}</span>}</p>
                     <p className="text-sm text-muted-foreground">{r.reason}</p>
                   </div>
                   <Chip tone={r.status === 'paid' ? 'success' : r.status === 'rejected' ? 'danger' : r.status === 'approved' ? 'brand' : 'attention'}>
