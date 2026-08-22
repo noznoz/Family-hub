@@ -16,6 +16,7 @@ import { ShareButton } from '@/components/ui/share-button';
 import { SecretValue } from '@/components/students/secret-value';
 import { StudentPrivateDialog } from '@/components/students/student-private-dialog';
 import { AcademicEditDialog } from '@/components/students/academic-edit-dialog';
+import { JourneyStagePicker } from '@/components/students/journey-stage-picker';
 import { MilestonesManager } from '@/components/students/milestones-manager';
 
 export const metadata: Metadata = { title: 'Student' };
@@ -37,10 +38,15 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     : await Promise.all([getStudentDetail(id), canSeeStudentPrivate(id)]);
   const priv = canPrivate ? await getStudentPrivate(id) : null;
 
-  const currentStage = student.overallStatus === 'Graduated' ? 5 : 2;
   const canEditAcademics = !session.isDemo && (
     session.member.role === 'admin' || session.member.role === 'parent' || session.memberId === detail?.memberId
   );
+  // Current journey stage: use the saved value; otherwise default to
+  // "Preparation" (still at home), or the last stage once graduated.
+  const savedStageIndex = detail?.journeyStage ? JOURNEY.indexOf(detail.journeyStage) : -1;
+  const currentStage = savedStageIndex >= 0
+    ? savedStageIndex
+    : (student.overallStatus === 'Graduated' ? JOURNEY.length - 1 : 0);
   const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: detail?.currency ?? 'GBP', maximumFractionDigits: 0 });
 
   const shareText = [
@@ -96,17 +102,13 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
 
       {/* ── Journey ──────────────────────────────────────────── */}
       <Section title="Journey">
-        <div className="flex items-center gap-1 overflow-x-auto pb-1">
-          {JOURNEY.map((stage, i) => (
-            <div key={stage} className="flex items-center gap-1">
-              <div className={'shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ' +
-                (i < currentStage ? 'bg-success-soft text-success' : i === currentStage ? 'bg-navy text-white' : 'bg-muted text-muted-foreground')}>
-                {stage}
-              </div>
-              {i < JOURNEY.length - 1 && <span className="text-navy-200">→</span>}
-            </div>
-          ))}
-        </div>
+        <JourneyStagePicker
+          studentId={id}
+          stages={JOURNEY}
+          currentIndex={currentStage}
+          canEdit={canEditAcademics}
+          live={!session.isDemo}
+        />
       </Section>
 
       {/* ── Contact ──────────────────────────────────────────── */}

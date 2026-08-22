@@ -353,6 +353,33 @@ export async function updateStudentAcademics(input: StudentAcademicsInput): Prom
   return { ok: true };
 }
 
+/** Set a student's current journey stage. Editable by parents/admins or the
+ *  student themselves. Stage is one of the JOURNEY labels (free text stored). */
+export async function setJourneyStage(studentId: string, stage: string): Promise<Result> {
+  if (!isSupabaseConfigured) return { ok: true };
+  const session = await getSessionUser();
+  if (!session) return { ok: false, error: 'Not signed in.' };
+  const supabase = await createClient();
+  if (!supabase) return { ok: false, error: 'Backend unavailable.' };
+
+  const { data: profile } = await supabase
+    .from('student_profiles')
+    .select('member_id, family_id')
+    .eq('id', studentId)
+    .maybeSingle();
+  if (!profile) return { ok: false, error: 'Student not found.' };
+  if (profile.family_id !== session.familyId) return { ok: false, error: 'Not in your family.' };
+  const role = session.member.role;
+  if (!(role === 'admin' || role === 'parent' || session.memberId === profile.member_id)) {
+    return { ok: false, error: 'You don’t have permission for this.' };
+  }
+
+  const { error } = await supabase.from('student_profiles').update({ journey_stage: stage }).eq('id', studentId);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/students/${studentId}`);
+  return { ok: true };
+}
+
 export interface AcademicYearInput {
   studentId: string;
   label: string;

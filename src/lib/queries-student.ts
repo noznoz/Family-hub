@@ -31,6 +31,7 @@ export interface StudentDetail {
   expectedGraduation: string | null;
   startDateISO: string | null;
   expectedGraduationISO: string | null;
+  journeyStage: string | null;
   years: { label: string; studyYear: number | null; status: string }[];
   funding: FundingPeriod[];
   milestones: Milestone[];
@@ -50,7 +51,7 @@ export async function getStudentDetail(studentId: string): Promise<StudentDetail
 
   const { data: sp } = await supabase
     .from('student_profiles')
-    .select('id, member_id, course, student_ref, campus, advisor, start_date, expected_graduation, member:family_members!student_profiles_member_id_fkey(display_name, profile_id, invite_email), university:universities(name, city, website), years:academic_years(label, study_year, status)')
+    .select('id, member_id, course, student_ref, campus, advisor, start_date, expected_graduation, journey_stage, member:family_members!student_profiles_member_id_fkey(display_name, profile_id, invite_email), university:universities(name, city, website), years:academic_years(label, study_year, status)')
     .eq('id', studentId)
     .maybeSingle();
   if (!sp) return null;
@@ -107,6 +108,7 @@ export async function getStudentDetail(studentId: string): Promise<StudentDetail
     expectedGraduation: fmtDate(sp.expected_graduation),
     startDateISO: (sp.start_date as string | null) ?? null,
     expectedGraduationISO: (sp.expected_graduation as string | null) ?? null,
+    journeyStage: (sp as { journey_stage?: string | null }).journey_stage ?? null,
     years: (((sp.years as { label: string; study_year: number | null; status: string }[]) ?? [])
       .sort((a, b) => (a.study_year ?? 0) - (b.study_year ?? 0))
       .map((y) => ({ label: y.label, studyYear: y.study_year, status: y.status }))),
