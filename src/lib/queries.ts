@@ -150,25 +150,28 @@ export async function getTasks(familyId: string): Promise<Task[]> {
   const rows = data ?? [];
 
   // Multi owners / related students come from the join tables, fetched
-  // separately (RLS scopes them to this family's tasks). Kept resilient: if
-  // these tables aren't reachable yet, the base task list still renders.
-  const [aRes, sRes] = await Promise.all([
-    supabase.from('task_assignees').select('task_id, member:family_members(id, display_name)'),
-    supabase.from('task_students').select('task_id, student:student_profiles(id, member:family_members!student_profiles_member_id_fkey(display_name))'),
-  ]);
-  if (aRes.error) console.error('[getTasks assignees]', aRes.error.message);
-  if (sRes.error) console.error('[getTasks students]', sRes.error.message);
-
+  // separately (RLS scopes them to this family's tasks) and merged in. Wrapped
+  // so any hiccup here can never blank the base task list.
   const assigneeMap = new Map<string, { id: string; name: string }[]>();
-  for (const r of aRes.data ?? []) {
-    const m = one<{ id: string; display_name: string }>((r as { member: unknown }).member);
-    if (m) assigneeMap.set(r.task_id, [...(assigneeMap.get(r.task_id) ?? []), { id: m.id, name: m.display_name }]);
-  }
   const studentMap = new Map<string, { id: string; name: string }[]>();
-  for (const r of sRes.data ?? []) {
-    const sp = one<{ id: string; member: unknown }>((r as { student: unknown }).student);
-    const name = sp ? one<{ display_name: string }>(sp.member)?.display_name : undefined;
-    if (sp && name) studentMap.set(r.task_id, [...(studentMap.get(r.task_id) ?? []), { id: sp.id, name }]);
+  try {
+    const [aRes, sRes] = await Promise.all([
+      supabase.from('task_assignees').select('task_id, member:family_members(id, display_name)'),
+      supabase.from('task_students').select('task_id, student:student_profiles(id, member:family_members!student_profiles_member_id_fkey(display_name))'),
+    ]);
+    if (aRes.error) console.error('[getTasks assignees]', aRes.error.message);
+    if (sRes.error) console.error('[getTasks students]', sRes.error.message);
+    for (const r of aRes.data ?? []) {
+      const m = one<{ id: string; display_name: string }>((r as { member: unknown }).member);
+      if (m) assigneeMap.set(r.task_id, [...(assigneeMap.get(r.task_id) ?? []), { id: m.id, name: m.display_name }]);
+    }
+    for (const r of sRes.data ?? []) {
+      const sp = one<{ id: string; member: unknown }>((r as { student: unknown }).student);
+      const name = sp ? one<{ display_name: string }>(sp.member)?.display_name : undefined;
+      if (sp && name) studentMap.set(r.task_id, [...(studentMap.get(r.task_id) ?? []), { id: sp.id, name }]);
+    }
+  } catch (e) {
+    console.error('[getTasks] link enrichment failed', e instanceof Error ? e.message : String(e));
   }
 
   // Group subtasks under their parent.
@@ -178,18 +181,22 @@ export async function getTasks(familyId: string): Promise<Task[]> {
     if (pid) subById.set(pid, [...(subById.get(pid) ?? []), { id: t.id, title: t.title, status: t.status as TaskStatus }]);
   }
 
-  return Promise.all(rows.filter((t) => !(t as { parent_task_id?: string | null }).parent_task_id).map(async (t) => {
-    const rec = ((t as { recurrence?: { frequency: string; active: boolean }[] }).recurrence ?? []).find((r) => r.active);
+  const parents = rows.filter((t) => !(t as { parent_task_id?: string | null }).parent_task_id);
+  // Sign attachments best-effort — a signing failure must not drop the task.
+  const signedUrls = await Promise.all(parents.map(async (t) => {
+    try { return await signMedia((t as { attachment_url?: string | null }).attachment_url); }
+    catch { return null; }
+  }));
 
+  return parents.map((t, i) => {
+    const rec = ((t as { recurrence?: { frequency: string; active: boolean }[] }).recurrence ?? []).find((r) => r.active);
     const asg = assigneeMap.get(t.id) ?? [];
     const std = studentMap.get(t.id) ?? [];
     const assigneeIds = asg.map((m) => m.id);
     const assignees = asg.map((m) => m.name);
     const studentIds = std.map((s) => s.id);
     const studentNames = std.map((s) => s.name);
-
     const primaryStudent = one<{ member: { display_name: string } | null }>(t.student)?.member?.display_name ?? studentNames[0];
-
     return {
       id: t.id,
       title: t.title,
@@ -207,10 +214,10 @@ export async function getTasks(familyId: string): Promise<Task[]> {
       assigneeId: (t as { assignee_id?: string | null }).assignee_id ?? assigneeIds[0] ?? null,
       assigneeIds,
       repeat: rec?.frequency ?? 'none',
-      attachmentUrl: await signMedia((t as { attachment_url?: string | null }).attachment_url),
+      attachmentUrl: signedUrls[i] ?? null,
       subtasks: subById.get(t.id) ?? [],
     };
-  }));
+  });
 }
 
 export async function getAttention(familyId: string): Promise<AttentionItem[]> {
