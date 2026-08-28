@@ -6,6 +6,7 @@ import { getStudents, getAttention, getHomeSummary, type HomeSummary } from '@/l
 import { demoStudents, demoAttention } from '@/lib/demo-data';
 import { StudentCard } from '@/components/home/student-card';
 import { AttentionList } from '@/components/home/attention-list';
+import { WorldClocks } from '@/components/home/world-clocks';
 import { NextPrayerCard } from '@/components/prayer/next-prayer-card';
 import { SectionTitle } from '@/components/ui/section-title';
 import { Card } from '@/components/ui/card';
@@ -37,6 +38,7 @@ export default async function HomePage() {
         <h1 className="text-2xl font-extrabold tracking-tight text-navy">Hi {member.displayName} 👋</h1>
       </div>
 
+      <WorldClocks />
       <NextPrayerCard />
 
       {summary && <DashboardStrip summary={summary} />}
@@ -87,6 +89,7 @@ function StudentHome({ name, student }: { name: string; student: StudentSummary 
         <p className="mt-1 text-sm text-muted-foreground">{student.university} · {student.academicYear}</p>
       </div>
 
+      <WorldClocks />
       <NextPrayerCard />
 
       <div className="grid grid-cols-2 gap-3">
