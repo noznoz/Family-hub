@@ -274,6 +274,9 @@ export async function markPaid(id: string, alsoCreateExpense: boolean): Promise<
     .eq('id', id);
   if (error) return { ok: false, error: error.message };
   await audit(c.session.familyId, c.userId, 'payment.paid', 'payment_request', id, { expenseId });
+  if (req.requested_by && req.requested_by !== c.session.memberId) {
+    try { await sendPushToMember(req.requested_by, { title: 'Payment sent ✅', body: `Your request for ${req.currency} ${req.amount} has been marked paid.`, url: '/money' }); } catch {}
+  }
   revalidatePath('/money');
   revalidatePath('/home');
   return { ok: true };

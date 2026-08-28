@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getSessionUser } from '@/lib/session';
 import { isSupabaseConfigured } from '@/lib/env';
+import { notifyMembers } from '@/lib/notify';
 
 type Result = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -31,6 +32,34 @@ export async function sendMessage(conversationId: string, body: string, attachme
     await supabase.from('message_attachments').insert(attachments.map((a) => ({
       message_id: data.id, storage_path: a.path, mime_type: a.mime ?? null, file_name: a.name ?? null, size_bytes: a.size ?? null,
     })));
+  }
+
+  // Notify everyone else in the conversation (phone push + in-app bell). Email
+  // is intentionally off for chat — it would be far too noisy.
+  try {
+    const [{ data: convo }, { data: members }] = await Promise.all([
+      supabase.from('conversations').select('title').eq('id', conversationId).maybeSingle(),
+      supabase.from('conversation_members').select('member_id').eq('conversation_id', conversationId),
+    ]);
+    const recipients = (members ?? [])
+      .map((m) => m.member_id as string | null)
+      .filter((id): id is string => !!id && id !== session.memberId);
+    if (recipients.length) {
+      const channel = convo?.title ? ` in ${convo.title}` : '';
+      const preview = trimmed ? (trimmed.length > 120 ? `${trimmed.slice(0, 120)}…` : trimmed) : '📎 Attachment';
+      await notifyMembers({
+        familyId: session.familyId,
+        memberIds: recipients,
+        title: `${session.member.displayName}${channel}`,
+        body: preview,
+        url: '/chat',
+        kind: 'new_message',
+        push: true,
+        email: false,
+      });
+    }
+  } catch (e) {
+    console.error('[sendMessage] notify failed:', e instanceof Error ? e.message : String(e));
   }
 
   revalidatePath('/chat');
