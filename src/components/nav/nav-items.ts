@@ -1,7 +1,7 @@
 import {
   Home, MessageCircle, ListChecks, Wallet, LayoutGrid,
   Plane, FileText, LifeBuoy, Users, Building2, GraduationCap,
-  Award, Calendar, Settings, UserRound, MoonStar, ScrollText, type LucideIcon,
+  Award, Calendar, Settings, UserRound, MoonStar, ScrollText, Images, type LucideIcon,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -24,6 +24,7 @@ export const moreNav: NavItem[] = [
   { href: '/profile', label: 'My profile', icon: UserRound },
   { href: '/prayer', label: 'Prayer times', icon: MoonStar },
   { href: '/support', label: 'Support', icon: LifeBuoy },
+  { href: '/albums', label: 'Photo albums', icon: Images },
   { href: '/travel', label: 'Travel', icon: Plane },
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/family', label: 'Family', icon: Users },

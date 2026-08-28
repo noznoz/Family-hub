@@ -22,6 +22,7 @@ export function dirFor(locale: Locale): 'ltr' | 'rtl' {
 const NAV: Record<string, string> = {
   Home: 'الرئيسية', Chat: 'المحادثة', Tasks: 'المهام', Money: 'المال', More: 'المزيد',
   'My profile': 'ملفي', 'Prayer times': 'مواقيت الصلاة', Support: 'المساعدة', Travel: 'السفر',
+  'Photo albums': 'ألبومات الصور',
   Documents: 'المستندات', Family: 'العائلة', Accommodation: 'السكن', University: 'الجامعة',
   Scholarship: 'المنحة', Calendar: 'التقويم', 'Activity log': 'سجل النشاط', Settings: 'الإعدادات',
 };
