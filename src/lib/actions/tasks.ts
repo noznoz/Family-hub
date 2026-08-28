@@ -14,11 +14,38 @@ export interface CreateTaskInput {
   dueDate?: string | null;
   studentId?: string | null;
   assigneeId?: string | null;
+  /** Multiple owners / related students. When present these win; the single
+   *  id fields are kept in sync with the first entry for compatibility. */
+  assigneeIds?: string[];
+  studentIds?: string[];
   repeat?: string | null;   // 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
   attachmentPath?: string | null;
 }
 
 type Result = { ok: true } | { ok: false; error: string };
+
+/** Normalise possibly-multi input to a de-duplicated list plus a primary id. */
+function idsOf(single: string | null | undefined, multi: string[] | undefined): { list: string[]; primary: string | null } {
+  const list = Array.from(new Set([...(multi ?? []), ...(single ? [single] : [])].filter(Boolean))) as string[];
+  return { list, primary: list[0] ?? null };
+}
+
+/** Replace the assignee/student join rows for a task. */
+async function setTaskLinks(
+  supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>,
+  taskId: string,
+  assigneeIds: string[],
+  studentIds: string[],
+) {
+  await supabase.from('task_assignees').delete().eq('task_id', taskId);
+  if (assigneeIds.length) {
+    await supabase.from('task_assignees').insert(assigneeIds.map((member_id) => ({ task_id: taskId, member_id })));
+  }
+  await supabase.from('task_students').delete().eq('task_id', taskId);
+  if (studentIds.length) {
+    await supabase.from('task_students').insert(studentIds.map((student_id) => ({ task_id: taskId, student_id })));
+  }
+}
 
 /** Advance an ISO date (YYYY-MM-DD) by one recurrence period. */
 function advance(dateIso: string, freq: string): string {
@@ -55,27 +82,33 @@ export async function createTask(input: CreateTaskInput): Promise<Result> {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const assignees = idsOf(input.assigneeId, input.assigneeIds);
+  const students = idsOf(input.studentId, input.studentIds);
+
   const { data: created, error } = await supabase.from('tasks').insert({
     family_id: session.familyId,
     title: input.title.trim(),
     description: input.description?.trim() || null,
     priority: input.priority,
     due_date: input.dueDate || null,
-    student_id: input.studentId || null,
-    assignee_id: input.assigneeId || null,
+    student_id: students.primary,
+    assignee_id: assignees.primary,
     attachment_url: input.attachmentPath || null,
     created_by: user?.id ?? null,
   }).select('id').single();
   if (error) return { ok: false, error: error.message };
-  if (created) await setRecurrence(supabase, created.id, input.repeat);
+  if (created) {
+    await setRecurrence(supabase, created.id, input.repeat);
+    await setTaskLinks(supabase, created.id, assignees.list, students.list);
+  }
 
-  // Notify the assignee across every channel (in-app + push + email), unless
-  // they assigned the task to themselves.
-  if (input.assigneeId && input.assigneeId !== session.memberId) {
+  // Notify every assignee (in-app + push + email), except the person creating it.
+  const notify = assignees.list.filter((id) => id !== session.memberId);
+  if (notify.length) {
     try {
       await notifyMembers({
         familyId: session.familyId,
-        memberIds: [input.assigneeId],
+        memberIds: notify,
         title: 'New task assigned to you',
         body: `${session.member.displayName} assigned you: ${input.title.trim()}`,
         url: '/tasks',
@@ -101,8 +134,12 @@ export async function updateTask(input: UpdateTaskInput): Promise<Result> {
   const supabase = await createClient();
   if (!supabase) return { ok: false, error: 'Backend unavailable.' };
 
-  // Note the current assignee so we only notify on an actual (re)assignment.
-  const { data: prev } = await supabase.from('tasks').select('assignee_id').eq('id', input.id).maybeSingle();
+  // Note the current assignees so we only notify people newly added.
+  const { data: prevRows } = await supabase.from('task_assignees').select('member_id').eq('task_id', input.id);
+  const prevAssignees = new Set((prevRows ?? []).map((r) => r.member_id as string));
+
+  const assignees = idsOf(input.assigneeId, input.assigneeIds);
+  const students = idsOf(input.studentId, input.studentIds);
 
   const { error } = await supabase
     .from('tasks')
@@ -111,23 +148,24 @@ export async function updateTask(input: UpdateTaskInput): Promise<Result> {
       description: input.description?.trim() || null,
       priority: input.priority,
       due_date: input.dueDate || null,
-      student_id: input.studentId || null,
-      assignee_id: input.assigneeId || null,
+      student_id: students.primary,
+      assignee_id: assignees.primary,
       ...(input.attachmentPath !== undefined ? { attachment_url: input.attachmentPath } : {}),
     })
     .eq('id', input.id);
   if (error) return { ok: false, error: error.message };
   if (input.repeat !== undefined) await setRecurrence(supabase, input.id, input.repeat);
+  await setTaskLinks(supabase, input.id, assignees.list, students.list);
 
-  if (
-    session && input.assigneeId &&
-    input.assigneeId !== prev?.assignee_id &&
-    input.assigneeId !== session.memberId
-  ) {
+  // Notify anyone newly assigned (not previously on the task, not the editor).
+  const newlyAssigned = session
+    ? assignees.list.filter((id) => !prevAssignees.has(id) && id !== session.memberId)
+    : [];
+  if (newlyAssigned.length && session) {
     try {
       await notifyMembers({
         familyId: session.familyId,
-        memberIds: [input.assigneeId],
+        memberIds: newlyAssigned,
         title: 'A task was assigned to you',
         body: `${session.member.displayName} assigned you: ${input.title.trim()}`,
         url: '/tasks',
@@ -171,6 +209,13 @@ export async function setTaskStatus(id: string, status: TaskStatus): Promise<Res
         if (next) {
           await supabase.from('task_recurrences').update({ active: false }).eq('id', rec.id);
           await supabase.from('task_recurrences').insert({ task_id: next.id, frequency: rec.frequency, interval_n: 1, active: true });
+          // Carry the full set of owners & related students to the next occurrence.
+          const [{ data: aRows }, { data: sRows }] = await Promise.all([
+            supabase.from('task_assignees').select('member_id').eq('task_id', id),
+            supabase.from('task_students').select('student_id').eq('task_id', id),
+          ]);
+          if (aRows?.length) await supabase.from('task_assignees').insert(aRows.map((r) => ({ task_id: next.id, member_id: r.member_id })));
+          if (sRows?.length) await supabase.from('task_students').insert(sRows.map((r) => ({ task_id: next.id, student_id: r.student_id })));
         }
       }
     }

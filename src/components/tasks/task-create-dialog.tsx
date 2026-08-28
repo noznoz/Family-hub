@@ -36,22 +36,25 @@ export function TaskCreateDialog({
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [assigneeIds, setAssigneeIds] = useState<string[]>(task?.assigneeIds ?? (task?.assigneeId ? [task.assigneeId] : []));
+  const [studentIds, setStudentIds] = useState<string[]>(task?.studentIds ?? (task?.studentId ? [task.studentId] : []));
+  const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (id: string) =>
+    setter((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
 
   const onSubmit = (formData: FormData) => {
     const title = String(formData.get('title') ?? '').trim();
     const description = String(formData.get('description') ?? '');
     const priority = String(formData.get('priority') ?? 'normal') as TaskPriority;
     const dueDate = String(formData.get('dueDate') ?? '') || null;
-    const studentId = String(formData.get('studentId') ?? '') || null;
-    const assigneeId = String(formData.get('assigneeId') ?? '') || null;
     const repeat = String(formData.get('repeat') ?? 'none');
     if (!title) {
       setError('Title is required.');
       return;
     }
     setError(null);
-    const studentName = students.find((s) => s.id === studentId)?.name;
-    const assigneeName = members.find((m) => m.id === assigneeId)?.name;
+    const studentNames = studentIds.map((id) => students.find((s) => s.id === id)?.name).filter((n): n is string => !!n);
+    const assigneeNames = assigneeIds.map((id) => members.find((m) => m.id === id)?.name).filter((n): n is string => !!n);
+    const primaryStudent = studentNames[0];
 
     startTransition(async () => {
       let attachmentPath: string | undefined;
@@ -62,8 +65,8 @@ export function TaskCreateDialog({
         attachmentPath = path;
       }
       const res = isEdit
-        ? await updateTask({ id: task!.id, title, description, priority, dueDate, studentId, assigneeId, repeat, ...(attachmentPath ? { attachmentPath } : {}) })
-        : await createTask({ title, description, priority, dueDate, studentId, assigneeId, repeat, attachmentPath });
+        ? await updateTask({ id: task!.id, title, description, priority, dueDate, assigneeIds, studentIds, repeat, ...(attachmentPath ? { attachmentPath } : {}) })
+        : await createTask({ title, description, priority, dueDate, assigneeIds, studentIds, repeat, attachmentPath });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -72,14 +75,18 @@ export function TaskCreateDialog({
         id: task?.id ?? crypto.randomUUID(),
         title,
         description: description || undefined,
-        assignee: assigneeName,
-        student: (studentName === 'Hamza' || studentName === 'Omar' ? studentName : null) as Task['student'],
+        assignee: assigneeNames[0],
+        assignees: assigneeNames,
+        student: (primaryStudent === 'Hamza' || primaryStudent === 'Omar' ? primaryStudent : null) as Task['student'],
+        students: studentNames,
         due: dueDate ? new Date(dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : null,
         priority,
         status: task?.status ?? 'todo',
         dueDate,
-        studentId,
-        assigneeId,
+        studentId: studentIds[0] ?? null,
+        studentIds,
+        assigneeId: assigneeIds[0] ?? null,
+        assigneeIds,
         repeat,
         attachmentUrl: attachmentPath ? '#' : task?.attachmentUrl ?? null,
       };
@@ -122,24 +129,40 @@ export function TaskCreateDialog({
               <option value="yearly">Yearly</option>
             </Select>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Related student" htmlFor="studentId">
-              <Select id="studentId" name="studentId" defaultValue={task?.studentId ?? ''}>
-                <option value="">None</option>
-                {students.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Assign to" htmlFor="assigneeId">
-              <Select id="assigneeId" name="assigneeId" defaultValue={task?.assigneeId ?? ''}>
-                <option value="">Unassigned</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </Select>
-            </Field>
-          </div>
+          <Field label={`Assign to${assigneeIds.length ? ` (${assigneeIds.length})` : ''}`}>
+            {members.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No members to assign.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {members.map((m) => {
+                  const on = assigneeIds.includes(m.id);
+                  return (
+                    <button key={m.id} type="button" onClick={() => toggle(setAssigneeIds)(m.id)}
+                      className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${on ? 'border-brand bg-brand-muted text-brand' : 'border-border text-navy hover:bg-muted'}`}>
+                      {on ? '✓ ' : ''}{m.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </Field>
+          <Field label={`Related student${studentIds.length ? ` (${studentIds.length})` : ''}`}>
+            {students.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No students.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {students.map((s) => {
+                  const on = studentIds.includes(s.id);
+                  return (
+                    <button key={s.id} type="button" onClick={() => toggle(setStudentIds)(s.id)}
+                      className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${on ? 'border-navy bg-navy text-white' : 'border-border text-navy hover:bg-muted'}`}>
+                      {on ? '✓ ' : ''}{s.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </Field>
           <div>
             <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-3 py-2.5 text-sm font-semibold text-navy hover:bg-muted">

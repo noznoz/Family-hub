@@ -39,15 +39,23 @@ export interface Task {
   id: string;
   title: string;
   description?: string;
+  /** Primary assignee name (first of assignees) — kept for compatibility. */
   assignee?: string;
+  /** All assignee display names. */
+  assignees?: string[];
+  /** Primary related student (first of students). */
   student?: 'Hamza' | 'Omar' | null;
+  /** All related student display names. */
+  students?: string[];
   due?: string | null;
   priority: TaskPriority;
   status: TaskStatus;
   // Raw fields for editing (not shown directly).
   dueDate?: string | null;
   studentId?: string | null;
+  studentIds?: string[];
   assigneeId?: string | null;
+  assigneeIds?: string[];
   repeat?: string | null;
   attachmentUrl?: string | null;
   subtasks?: { id: string; title: string; status: TaskStatus }[];

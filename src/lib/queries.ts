@@ -142,7 +142,7 @@ export async function getTasks(familyId: string): Promise<Task[]> {
   if (!supabase) return [];
   const { data } = await supabase
     .from('tasks')
-    .select('id, title, description, priority, status, due_date, assignee_id, student_id, parent_task_id, attachment_url, assignee:family_members!tasks_assignee_id_fkey(display_name), student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), recurrence:task_recurrences(frequency, active)')
+    .select('id, title, description, priority, status, due_date, assignee_id, student_id, parent_task_id, attachment_url, assignee:family_members!tasks_assignee_id_fkey(display_name), student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), recurrence:task_recurrences(frequency, active), assignees:task_assignees(member:family_members(id, display_name)), relStudents:task_students(student:student_profiles(id, member:family_members!student_profiles_member_id_fkey(display_name)))')
     .eq('family_id', familyId)
     .order('due_date', { ascending: true });
 
@@ -155,20 +155,42 @@ export async function getTasks(familyId: string): Promise<Task[]> {
   }
 
   return Promise.all(rows.filter((t) => !(t as { parent_task_id?: string | null }).parent_task_id).map(async (t) => {
-    const studentName = one<{ member: { display_name: string } | null }>(t.student)?.member?.display_name;
     const rec = ((t as { recurrence?: { frequency: string; active: boolean }[] }).recurrence ?? []).find((r) => r.active);
+
+    // Multi assignees / related students from the join tables. Nested relations
+    // come back as object-or-array from PostgREST, so normalise with one().
+    const assigneeRows = ((t as { assignees?: { member: unknown }[] }).assignees ?? [])
+      .map((a) => one<{ id: string; display_name: string }>(a.member))
+      .filter((m): m is { id: string; display_name: string } => !!m);
+    const studentRows = ((t as { relStudents?: { student: unknown }[] }).relStudents ?? [])
+      .map((r) => one<{ id: string; member: unknown }>(r.student))
+      .filter((s): s is { id: string; member: unknown } => !!s);
+
+    const assigneeIds = assigneeRows.map((m) => m.id);
+    const assignees = assigneeRows.map((m) => m.display_name);
+    const studentIds = studentRows.map((s) => s.id);
+    const studentNames = studentRows
+      .map((s) => one<{ display_name: string }>(s.member)?.display_name)
+      .filter((n): n is string => !!n);
+
+    const primaryStudent = one<{ member: { display_name: string } | null }>(t.student)?.member?.display_name ?? studentNames[0];
+
     return {
       id: t.id,
       title: t.title,
       description: t.description ?? undefined,
-      assignee: one<{ display_name: string }>(t.assignee)?.display_name ?? undefined,
-      student: (studentName === 'Hamza' || studentName === 'Omar' ? studentName : null) as Task['student'],
+      assignee: one<{ display_name: string }>(t.assignee)?.display_name ?? assignees[0] ?? undefined,
+      assignees,
+      student: (primaryStudent === 'Hamza' || primaryStudent === 'Omar' ? primaryStudent : null) as Task['student'],
+      students: studentNames,
       due: t.due_date ? dueLabel(t.due_date) : null,
       priority: t.priority as TaskPriority,
       status: t.status as TaskStatus,
       dueDate: t.due_date ?? null,
-      studentId: (t as { student_id?: string | null }).student_id ?? null,
-      assigneeId: (t as { assignee_id?: string | null }).assignee_id ?? null,
+      studentId: (t as { student_id?: string | null }).student_id ?? studentIds[0] ?? null,
+      studentIds,
+      assigneeId: (t as { assignee_id?: string | null }).assignee_id ?? assigneeIds[0] ?? null,
+      assigneeIds,
       repeat: rec?.frequency ?? 'none',
       attachmentUrl: await signMedia((t as { attachment_url?: string | null }).attachment_url),
       subtasks: subById.get(t.id) ?? [],

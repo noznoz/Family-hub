@@ -69,11 +69,29 @@ export async function getStudentDetail(studentId: string): Promise<StudentDetail
   }
 
   const today = new Date().toISOString().slice(0, 10);
+
+  // Tasks linked to this student/member via the multi join tables (in addition
+  // to the legacy single columns), so a task related to several kids shows on
+  // each of their profiles.
+  const [taskStudentRows, taskAssigneeRows] = await Promise.all([
+    supabase.from('task_students').select('task_id').eq('student_id', studentId),
+    supabase.from('task_assignees').select('task_id').eq('member_id', memberId),
+  ]);
+  const linkedTaskIds = Array.from(new Set([
+    ...(taskStudentRows.data ?? []).map((r) => r.task_id as string),
+    ...(taskAssigneeRows.data ?? []).map((r) => r.task_id as string),
+  ]));
+  const taskOr = [
+    `student_id.eq.${studentId}`,
+    `assignee_id.eq.${memberId}`,
+    ...(linkedTaskIds.length ? [`id.in.(${linkedTaskIds.join(',')})`] : []),
+  ].join(',');
+
   const [fundRes, mileRes, accRes, taskRes, expRes, reqRes, docRes, tripRes] = await Promise.all([
     supabase.from('funding_sources').select('id, label, status, start_date, end_date').eq('student_id', studentId).order('start_date', { ascending: true }),
     supabase.from('student_milestones').select('id, title, occurred_on, description, kind').eq('student_id', studentId).order('occurred_on', { ascending: true }),
     supabase.from('accommodations').select('property, address, monthly_rent, currency, end_date, start_date').eq('student_id', studentId).order('start_date', { ascending: false }),
-    supabase.from('tasks').select('id, title, status, priority, due_date').or(`student_id.eq.${studentId},assignee_id.eq.${memberId}`).neq('status', 'done').order('due_date', { ascending: true }).limit(20),
+    supabase.from('tasks').select('id, title, status, priority, due_date').or(taskOr).neq('status', 'done').order('due_date', { ascending: true }).limit(20),
     supabase.from('expenses').select('amount, currency').eq('student_id', studentId).limit(500),
     supabase.from('payment_requests').select('id', { count: 'exact', head: true }).eq('student_id', studentId).eq('status', 'requested'),
     supabase.from('documents').select('id', { count: 'exact', head: true }).eq('student_id', studentId),

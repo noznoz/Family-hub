@@ -45,16 +45,17 @@ export function TasksView({
   const [filter, setFilter] = useState<Filter>('My Tasks');
   const [, startTransition] = useTransition();
 
+  const studentsOf = (t: Task): string[] => (t.students?.length ? t.students : t.student ? [t.student] : []);
   const filtered = useMemo(() => {
     switch (filter) {
       case 'Completed':
         return tasks.filter((t) => t.status === 'done');
       case 'Hamza':
-        return tasks.filter((t) => t.student === 'Hamza' && t.status !== 'done');
+        return tasks.filter((t) => studentsOf(t).includes('Hamza') && t.status !== 'done');
       case 'Omar':
-        return tasks.filter((t) => t.student === 'Omar' && t.status !== 'done');
+        return tasks.filter((t) => studentsOf(t).includes('Omar') && t.status !== 'done');
       case 'Family':
-        return tasks.filter((t) => !t.student && t.status !== 'done');
+        return tasks.filter((t) => studentsOf(t).length === 0 && t.status !== 'done');
       default:
         return tasks.filter((t) => t.status !== 'done');
     }
@@ -139,8 +140,8 @@ export function TasksView({
                   }
                 />
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  {t.student && <Chip tone="navy">{t.student}</Chip>}
-                  {t.assignee && <Chip tone="neutral">{t.assignee}</Chip>}
+                  {(t.students?.length ? t.students : t.student ? [t.student] : []).map((s) => <Chip key={`s-${s}`} tone="navy">{s}</Chip>)}
+                  {(t.assignees?.length ? t.assignees : t.assignee ? [t.assignee] : []).map((a) => <Chip key={`a-${a}`} tone="neutral">{a}</Chip>)}
                   {t.priority !== 'normal' && <Chip tone={priorityTone[t.priority]}>{t.priority}</Chip>}
                   {t.repeat && t.repeat !== 'none' && <Chip tone="neutral">🔁 {t.repeat}</Chip>}
                   {t.status !== 'done' && <Chip tone="brand">{statusLabel[t.status]}</Chip>}
