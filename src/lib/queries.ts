@@ -140,38 +140,48 @@ async function enrichStudent(
 export async function getTasks(familyId: string): Promise<Task[]> {
   const supabase = await createClient();
   if (!supabase) return [];
+
+  // Base rows with NO embeds — as reliable as any plain select (a bad embed
+  // would 400 the whole query and blank the list, which is what bit us before).
   const { data, error } = await supabase
     .from('tasks')
-    .select('id, title, description, priority, status, due_date, assignee_id, student_id, parent_task_id, attachment_url, assignee:family_members!tasks_assignee_id_fkey(display_name), student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), recurrence:task_recurrences(frequency, active)')
+    .select('id, title, description, priority, status, due_date, assignee_id, student_id, parent_task_id, attachment_url')
     .eq('family_id', familyId)
     .order('due_date', { ascending: true });
   if (error) console.error('[getTasks]', error.code, error.message);
-
   const rows = data ?? [];
+  if (rows.length === 0) return [];
 
-  // Multi owners / related students come from the join tables, fetched
-  // separately (RLS scopes them to this family's tasks) and merged in. Wrapped
-  // so any hiccup here can never blank the base task list.
-  const assigneeMap = new Map<string, { id: string; name: string }[]>();
-  const studentMap = new Map<string, { id: string; name: string }[]>();
+  // Resolve names & links via plain, embed-free lookups (each fail-safe).
+  const memberName = new Map<string, string>();          // member id -> display name
+  const studentDisplay = new Map<string, string>();      // student_profile id -> member name
+  const recurByTask = new Map<string, string>();         // task id -> frequency
+  const assigneeByTask = new Map<string, { id: string; name: string }[]>();
+  const studentByTask = new Map<string, { id: string; name: string }[]>();
   try {
-    const [aRes, sRes] = await Promise.all([
-      supabase.from('task_assignees').select('task_id, member:family_members(id, display_name)'),
-      supabase.from('task_students').select('task_id, student:student_profiles(id, member:family_members!student_profiles_member_id_fkey(display_name))'),
+    const [memRes, spRes, recRes, taRes, tsRes] = await Promise.all([
+      supabase.from('family_members').select('id, display_name').eq('family_id', familyId),
+      supabase.from('student_profiles').select('id, member_id').eq('family_id', familyId),
+      supabase.from('task_recurrences').select('task_id, frequency').eq('active', true),
+      supabase.from('task_assignees').select('task_id, member_id'),
+      supabase.from('task_students').select('task_id, student_id'),
     ]);
-    if (aRes.error) console.error('[getTasks assignees]', aRes.error.message);
-    if (sRes.error) console.error('[getTasks students]', sRes.error.message);
-    for (const r of aRes.data ?? []) {
-      const m = one<{ id: string; display_name: string }>((r as { member: unknown }).member);
-      if (m) assigneeMap.set(r.task_id, [...(assigneeMap.get(r.task_id) ?? []), { id: m.id, name: m.display_name }]);
+    for (const m of memRes.data ?? []) memberName.set(m.id, m.display_name);
+    for (const sp of spRes.data ?? []) {
+      const nm = memberName.get((sp as { member_id: string }).member_id);
+      if (nm) studentDisplay.set(sp.id, nm);
     }
-    for (const r of sRes.data ?? []) {
-      const sp = one<{ id: string; member: unknown }>((r as { student: unknown }).student);
-      const name = sp ? one<{ display_name: string }>(sp.member)?.display_name : undefined;
-      if (sp && name) studentMap.set(r.task_id, [...(studentMap.get(r.task_id) ?? []), { id: sp.id, name }]);
+    for (const r of recRes.data ?? []) recurByTask.set(r.task_id, r.frequency);
+    for (const r of taRes.data ?? []) {
+      const nm = memberName.get(r.member_id);
+      if (nm) assigneeByTask.set(r.task_id, [...(assigneeByTask.get(r.task_id) ?? []), { id: r.member_id, name: nm }]);
+    }
+    for (const r of tsRes.data ?? []) {
+      const nm = studentDisplay.get(r.student_id);
+      if (nm) studentByTask.set(r.task_id, [...(studentByTask.get(r.task_id) ?? []), { id: r.student_id, name: nm }]);
     }
   } catch (e) {
-    console.error('[getTasks] link enrichment failed', e instanceof Error ? e.message : String(e));
+    console.error('[getTasks] lookups failed', e instanceof Error ? e.message : String(e));
   }
 
   // Group subtasks under their parent.
@@ -189,31 +199,34 @@ export async function getTasks(familyId: string): Promise<Task[]> {
   }));
 
   return parents.map((t, i) => {
-    const rec = ((t as { recurrence?: { frequency: string; active: boolean }[] }).recurrence ?? []).find((r) => r.active);
-    const asg = assigneeMap.get(t.id) ?? [];
-    const std = studentMap.get(t.id) ?? [];
-    const assigneeIds = asg.map((m) => m.id);
+    const aId = (t as { assignee_id?: string | null }).assignee_id ?? null;
+    const sId = (t as { student_id?: string | null }).student_id ?? null;
+    const asg = assigneeByTask.get(t.id)
+      ?? (aId && memberName.get(aId) ? [{ id: aId, name: memberName.get(aId)! }] : []);
+    const std = studentByTask.get(t.id)
+      ?? (sId && studentDisplay.get(sId) ? [{ id: sId, name: studentDisplay.get(sId)! }] : []);
     const assignees = asg.map((m) => m.name);
+    const assigneeIds = asg.map((m) => m.id);
+    const students = std.map((s) => s.name);
     const studentIds = std.map((s) => s.id);
-    const studentNames = std.map((s) => s.name);
-    const primaryStudent = one<{ member: { display_name: string } | null }>(t.student)?.member?.display_name ?? studentNames[0];
+    const primaryStudent = (sId ? studentDisplay.get(sId) : undefined) ?? students[0];
     return {
       id: t.id,
       title: t.title,
       description: t.description ?? undefined,
-      assignee: one<{ display_name: string }>(t.assignee)?.display_name ?? assignees[0] ?? undefined,
+      assignee: (aId ? memberName.get(aId) : undefined) ?? assignees[0] ?? undefined,
       assignees,
       student: (primaryStudent === 'Hamza' || primaryStudent === 'Omar' ? primaryStudent : null) as Task['student'],
-      students: studentNames,
+      students,
       due: t.due_date ? dueLabel(t.due_date) : null,
       priority: t.priority as TaskPriority,
       status: t.status as TaskStatus,
       dueDate: t.due_date ?? null,
-      studentId: (t as { student_id?: string | null }).student_id ?? studentIds[0] ?? null,
+      studentId: sId ?? studentIds[0] ?? null,
       studentIds,
-      assigneeId: (t as { assignee_id?: string | null }).assignee_id ?? assigneeIds[0] ?? null,
+      assigneeId: aId ?? assigneeIds[0] ?? null,
       assigneeIds,
-      repeat: rec?.frequency ?? 'none',
+      repeat: recurByTask.get(t.id) ?? 'none',
       attachmentUrl: signedUrls[i] ?? null,
       subtasks: subById.get(t.id) ?? [],
     };
