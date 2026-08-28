@@ -42,6 +42,8 @@ export interface StudentDetail {
   openRequests: number;
   documentsCount: number;
   upcomingTrips: { title: string; when: string }[];
+  nextDepartureISO: string | null;
+  checklist: { id: string; title: string; category: string; done: boolean; due: string | null }[];
 }
 
 /** Everything about one student, pulled from across the app. */
@@ -87,7 +89,7 @@ export async function getStudentDetail(studentId: string): Promise<StudentDetail
     ...(linkedTaskIds.length ? [`id.in.(${linkedTaskIds.join(',')})`] : []),
   ].join(',');
 
-  const [fundRes, mileRes, accRes, taskRes, expRes, reqRes, docRes, tripRes] = await Promise.all([
+  const [fundRes, mileRes, accRes, taskRes, expRes, reqRes, docRes, tripRes, chkRes] = await Promise.all([
     supabase.from('funding_sources').select('id, label, status, start_date, end_date').eq('student_id', studentId).order('start_date', { ascending: true }),
     supabase.from('student_milestones').select('id, title, occurred_on, description, kind').eq('student_id', studentId).order('occurred_on', { ascending: true }),
     supabase.from('accommodations').select('property, address, monthly_rent, currency, end_date, start_date').eq('student_id', studentId).order('start_date', { ascending: false }),
@@ -96,6 +98,7 @@ export async function getStudentDetail(studentId: string): Promise<StudentDetail
     supabase.from('payment_requests').select('id', { count: 'exact', head: true }).eq('student_id', studentId).eq('status', 'requested'),
     supabase.from('documents').select('id', { count: 'exact', head: true }).eq('student_id', studentId),
     supabase.from('trip_members').select('trip:trips(title, depart_at)').eq('member_id', memberId),
+    supabase.from('student_checklist_items').select('id, title, category, done, due_date').eq('student_id', studentId).order('done', { ascending: true }).order('sort_order', { ascending: true }),
   ]);
 
   const acc = (accRes.data ?? []).find((a) => (!a.end_date || a.end_date >= today) && (!a.start_date || a.start_date <= today)) ?? (accRes.data ?? [])[0];
@@ -103,12 +106,12 @@ export async function getStudentDetail(studentId: string): Promise<StudentDetail
   const currency = expenses[0]?.currency ?? 'GBP';
   const spentTotal = expenses.reduce((sum, e) => sum + Number(e.amount ?? 0), 0);
 
-  const upcomingTrips = (tripRes.data ?? [])
+  const upcomingRaw = (tripRes.data ?? [])
     .map((t) => one<{ title: string; depart_at: string }>(t.trip))
     .filter((t): t is { title: string; depart_at: string } => !!t?.depart_at && new Date(t.depart_at) > new Date())
-    .sort((a, b) => +new Date(a.depart_at) - +new Date(b.depart_at))
-    .slice(0, 4)
-    .map((t) => ({ title: t.title, when: dueLabel(t.depart_at) }));
+    .sort((a, b) => +new Date(a.depart_at) - +new Date(b.depart_at));
+  const upcomingTrips = upcomingRaw.slice(0, 4).map((t) => ({ title: t.title, when: dueLabel(t.depart_at) }));
+  const nextDepartureISO = upcomingRaw[0]?.depart_at ?? null;
 
   return {
     memberId,
@@ -142,6 +145,11 @@ export async function getStudentDetail(studentId: string): Promise<StudentDetail
     openRequests: reqRes.count ?? 0,
     documentsCount: docRes.count ?? 0,
     upcomingTrips,
+    nextDepartureISO,
+    checklist: (chkRes.data ?? []).map((i) => ({
+      id: i.id, title: i.title, category: (i as { category?: string }).category ?? 'other',
+      done: !!i.done, due: (i as { due_date?: string | null }).due_date ?? null,
+    })),
   };
 }
 

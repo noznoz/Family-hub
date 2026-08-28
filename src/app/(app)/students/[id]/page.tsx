@@ -17,6 +17,7 @@ import { SecretValue } from '@/components/students/secret-value';
 import { StudentPrivateDialog } from '@/components/students/student-private-dialog';
 import { AcademicEditDialog } from '@/components/students/academic-edit-dialog';
 import { JourneyStagePicker } from '@/components/students/journey-stage-picker';
+import { MovePrep } from '@/components/students/move-prep';
 import { MilestonesManager } from '@/components/students/milestones-manager';
 
 export const metadata: Metadata = { title: 'Student' };
@@ -110,6 +111,19 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
           live={!session.isDemo}
         />
       </Section>
+
+      {/* ── Move to the UK (checklist + countdown) ───────────── */}
+      {detail && (
+        <MovePrep
+          studentId={id}
+          name={student.name}
+          items={detail.checklist}
+          nextDepartureISO={detail.nextDepartureISO}
+          termStartISO={detail.startDateISO}
+          live={!session.isDemo}
+          canManage={canEditAcademics}
+        />
+      )}
 
       {/* ── Contact ──────────────────────────────────────────── */}
       <Section title="Contact & personal">
