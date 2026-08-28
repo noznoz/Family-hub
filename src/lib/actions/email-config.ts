@@ -87,3 +87,16 @@ export async function sendTestEmail(): Promise<Result> {
   if (!res.ok) return { ok: false, error: 'Send failed. Check the key, and that your address is allowed (verify a domain in Resend for other recipients).' };
   return { ok: true };
 }
+
+/** Admin-only. Send the weekly family digest right now (to this family). */
+export async function sendWeeklySummaryNow(): Promise<Result> {
+  const g = await requireAdmin();
+  if (!g.ok) return g;
+  try {
+    const { sendFamilyDigest } = await import('@/lib/weekly-summary');
+    const sent = await sendFamilyDigest(g.admin, g.session.familyId);
+    return sent ? { ok: true } : { ok: false, error: 'Nothing to summarise this week — no upcoming flights, tasks, docs or requests.' };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Failed to send.' };
+  }
+}

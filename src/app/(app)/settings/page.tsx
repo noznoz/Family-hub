@@ -10,6 +10,8 @@ import { ROLE_DEFAULTS } from '@/lib/permissions';
 import { EnableNotifications } from '@/components/pwa/enable-notifications';
 import { EmailSettings } from '@/components/settings/email-settings';
 import { getEmailStatus } from '@/lib/actions/email-config';
+import { PushSetup } from '@/components/settings/push-setup';
+import { getPushStatus } from '@/lib/actions/push-config';
 import { ThemePicker } from '@/components/settings/theme-picker';
 import { LanguagePicker } from '@/components/settings/language-picker';
 import { CurrencyPicker } from '@/components/settings/currency-picker';
@@ -23,7 +25,10 @@ export default async function SettingsPage() {
   if (!session) return null;
   const { member, isDemo } = session;
   const perms = ROLE_DEFAULTS[member.role];
-  const emailStatus = !isDemo && member.role === 'admin' ? await getEmailStatus() : null;
+  const isAdmin = !isDemo && member.role === 'admin';
+  const [emailStatus, pushStatus] = isAdmin
+    ? await Promise.all([getEmailStatus(), getPushStatus()])
+    : [null, null];
 
   return (
     <div className="space-y-5">
@@ -56,6 +61,7 @@ export default async function SettingsPage() {
           Push notifications
         </p>
         <Card className="p-4">
+          {pushStatus && <PushSetup status={pushStatus} />}
           <EnableNotifications />
         </Card>
       </div>

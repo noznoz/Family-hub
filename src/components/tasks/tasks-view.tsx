@@ -16,7 +16,7 @@ import { TaskCommentsDialog } from './task-comments-dialog';
 import { TaskSubtasks } from './task-subtasks';
 import type { Task, TaskPriority, TaskStatus } from '@/lib/types';
 
-const FILTERS = ['My Tasks', 'Hamza', 'Omar', 'Family', 'Completed'] as const;
+const FILTERS = ['Mine', 'All', 'Hamza', 'Omar', 'Family', 'Completed'] as const;
 type Filter = (typeof FILTERS)[number];
 
 const priorityTone: Record<TaskPriority, 'neutral' | 'attention' | 'danger'> = {
@@ -42,14 +42,17 @@ export function TasksView({
   members: { id: string; name: string }[];
 }) {
   const [tasks, setTasks] = useState(initial);
-  const [filter, setFilter] = useState<Filter>('My Tasks');
+  const [filter, setFilter] = useState<Filter>('Mine');
   const [, startTransition] = useTransition();
 
   const studentsOf = (t: Task): string[] => (t.students?.length ? t.students : t.student ? [t.student] : []);
+  const ownersOf = (t: Task): string[] => (t.assigneeIds?.length ? t.assigneeIds : t.assigneeId ? [t.assigneeId] : []);
   const filtered = useMemo(() => {
     switch (filter) {
       case 'Completed':
         return tasks.filter((t) => t.status === 'done');
+      case 'Mine':
+        return tasks.filter((t) => ownersOf(t).includes(meId) && t.status !== 'done');
       case 'Hamza':
         return tasks.filter((t) => studentsOf(t).includes('Hamza') && t.status !== 'done');
       case 'Omar':
@@ -59,7 +62,7 @@ export function TasksView({
       default:
         return tasks.filter((t) => t.status !== 'done');
     }
-  }, [tasks, filter]);
+  }, [tasks, filter, meId]);
 
   const toggle = (id: string) => {
     let next: TaskStatus = 'todo';

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/ui/field';
 import { Chip } from '@/components/ui/chip';
-import { saveEmailConfig, sendTestEmail, type EmailStatus } from '@/lib/actions/email-config';
+import { saveEmailConfig, sendTestEmail, sendWeeklySummaryNow, type EmailStatus } from '@/lib/actions/email-config';
 
 export function EmailSettings({ status }: { status: EmailStatus }) {
   const router = useRouter();
@@ -31,6 +31,14 @@ export function EmailSettings({ status }: { status: EmailStatus }) {
     start(async () => {
       const res = await sendTestEmail();
       setMsg(res.ok ? { ok: true, text: 'Test sent — check your inbox.' } : { ok: false, text: res.error });
+    });
+  };
+
+  const onWeekly = () => {
+    setMsg(null);
+    start(async () => {
+      const res = await sendWeeklySummaryNow();
+      setMsg(res.ok ? { ok: true, text: 'Weekly summary sent to the family.' } : { ok: false, text: res.error });
     });
   };
 
@@ -73,6 +81,16 @@ export function EmailSettings({ status }: { status: EmailStatus }) {
           <p className="text-[11px] text-muted-foreground">
             New Resend accounts can only email your own address until you verify a domain in Resend. Your key is stored server-side and never shown again.
           </p>
+
+          {status.configured && (
+            <div className="mt-1 flex items-center justify-between gap-2 border-t border-border pt-3">
+              <div>
+                <p className="text-sm font-semibold text-navy">Weekly family summary</p>
+                <p className="text-[11px] text-muted-foreground">Auto-sends every Sunday. Send one now to preview.</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={onWeekly} disabled={pending}>Send now</Button>
+            </div>
+          )}
         </>
       )}
 
