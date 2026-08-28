@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { PERMISSION_LABELS } from '@/lib/permissions';
 import { ROLE_DEFAULTS } from '@/lib/permissions';
 import { EnableNotifications } from '@/components/pwa/enable-notifications';
+import { EmailSettings } from '@/components/settings/email-settings';
+import { getEmailStatus } from '@/lib/actions/email-config';
 import { ThemePicker } from '@/components/settings/theme-picker';
 import { LanguagePicker } from '@/components/settings/language-picker';
 import { CurrencyPicker } from '@/components/settings/currency-picker';
@@ -21,6 +23,7 @@ export default async function SettingsPage() {
   if (!session) return null;
   const { member, isDemo } = session;
   const perms = ROLE_DEFAULTS[member.role];
+  const emailStatus = !isDemo && member.role === 'admin' ? await getEmailStatus() : null;
 
   return (
     <div className="space-y-5">
@@ -56,6 +59,13 @@ export default async function SettingsPage() {
           <EnableNotifications />
         </Card>
       </div>
+
+      {emailStatus && (
+        <div>
+          <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Email notifications</p>
+          <EmailSettings status={emailStatus} />
+        </div>
+      )}
 
       <Card className="divide-y divide-border">
         <RowLink icon={<ShieldCheck className="size-5" />} label="Privacy & security" />
