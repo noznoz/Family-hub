@@ -233,6 +233,40 @@ export async function getTasks(familyId: string): Promise<Task[]> {
   });
 }
 
+export interface HomeSummary {
+  nextTrip: { title: string; iso: string } | null;
+  openTasks: number;
+  docsExpiring: number;
+  openRequests: number;
+}
+
+/** At-a-glance counts + nearest upcoming trip for the Home dashboard. */
+export async function getHomeSummary(familyId: string): Promise<HomeSummary> {
+  const empty: HomeSummary = { nextTrip: null, openTasks: 0, docsExpiring: 0, openRequests: 0 };
+  const supabase = await createClient();
+  if (!supabase) return empty;
+  const now = new Date().toISOString();
+  const soon90 = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+  try {
+    const [tripRes, taskRes, docRes, reqRes] = await Promise.all([
+      supabase.from('trips').select('title, depart_at').eq('family_id', familyId).gt('depart_at', now).order('depart_at', { ascending: true }).limit(1),
+      supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('family_id', familyId).neq('status', 'done').is('parent_task_id', null),
+      supabase.from('documents').select('id', { count: 'exact', head: true }).eq('family_id', familyId).not('expiry_date', 'is', null).lte('expiry_date', soon90),
+      supabase.from('payment_requests').select('id', { count: 'exact', head: true }).eq('family_id', familyId).eq('status', 'requested'),
+    ]);
+    const trip = tripRes.data?.[0];
+    return {
+      nextTrip: trip?.depart_at ? { title: trip.title, iso: trip.depart_at } : null,
+      openTasks: taskRes.count ?? 0,
+      docsExpiring: docRes.count ?? 0,
+      openRequests: reqRes.count ?? 0,
+    };
+  } catch (e) {
+    console.error('[getHomeSummary]', e instanceof Error ? e.message : String(e));
+    return empty;
+  }
+}
+
 export async function getAttention(familyId: string): Promise<AttentionItem[]> {
   try {
     return await getAttentionInner(familyId);

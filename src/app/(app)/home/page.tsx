@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ListChecks, Wallet, Plane, FileText, LifeBuoy } from 'lucide-react';
+import { ListChecks, Wallet, Plane, FileText, LifeBuoy, HandCoins } from 'lucide-react';
 import { getSessionUser } from '@/lib/session';
-import { getStudents, getAttention } from '@/lib/queries';
+import { getStudents, getAttention, getHomeSummary, type HomeSummary } from '@/lib/queries';
 import { demoStudents, demoAttention } from '@/lib/demo-data';
 import { StudentCard } from '@/components/home/student-card';
 import { AttentionList } from '@/components/home/attention-list';
@@ -18,9 +18,9 @@ export default async function HomePage() {
   if (!session) return null;
   const { member } = session;
 
-  const [students, attention] = session.isDemo
-    ? [demoStudents, demoAttention]
-    : await Promise.all([getStudents(session.familyId), getAttention(session.familyId)]);
+  const [students, attention, summary] = session.isDemo
+    ? [demoStudents, demoAttention, null]
+    : await Promise.all([getStudents(session.familyId), getAttention(session.familyId), getHomeSummary(session.familyId)]);
 
   // Student-specific dashboard
   if (member.role === 'student') {
@@ -38,6 +38,8 @@ export default async function HomePage() {
       </div>
 
       <NextPrayerCard />
+
+      {summary && <DashboardStrip summary={summary} />}
 
       {students.length === 0 ? (
         <Card className="p-6 text-center text-sm text-muted-foreground">
@@ -141,4 +143,29 @@ function getGreeting() {
   if (h < 12) return 'Good morning';
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
+}
+
+function DashboardStrip({ summary }: { summary: HomeSummary }) {
+  const days = summary.nextTrip ? Math.max(0, Math.ceil((new Date(summary.nextTrip.iso).getTime() - Date.now()) / 86_400_000)) : null;
+  const tiles = [
+    days !== null
+      ? { href: '/travel', icon: Plane, label: 'Next flight', value: `${days}d`, tone: 'bg-navy text-white' }
+      : { href: '/travel', icon: Plane, label: 'Trips', value: '—', tone: 'bg-muted text-navy' },
+    { href: '/tasks', icon: ListChecks, label: 'Open tasks', value: String(summary.openTasks), tone: 'bg-attention-soft text-attention' },
+    { href: '/documents', icon: FileText, label: 'Docs expiring', value: String(summary.docsExpiring), tone: 'bg-brand-muted text-brand' },
+    { href: '/money', icon: HandCoins, label: 'Requests', value: String(summary.openRequests), tone: 'bg-success-soft text-success' },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {tiles.map((t) => (
+        <Link key={t.label} href={t.href}>
+          <Card className="flex h-full flex-col gap-1.5 p-3 transition-shadow hover:shadow-card-hover">
+            <span className={`inline-flex size-8 items-center justify-center rounded-lg ${t.tone}`}><t.icon className="size-4" /></span>
+            <span className="text-xl font-extrabold text-navy">{t.value}</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t.label}</span>
+          </Card>
+        </Link>
+      ))}
+    </div>
+  );
 }

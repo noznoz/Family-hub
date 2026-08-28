@@ -18,6 +18,7 @@ import { StudentPrivateDialog } from '@/components/students/student-private-dial
 import { AcademicEditDialog } from '@/components/students/academic-edit-dialog';
 import { JourneyStagePicker } from '@/components/students/journey-stage-picker';
 import { MovePrep } from '@/components/students/move-prep';
+import { EmergencyCard } from '@/components/students/emergency-card';
 import { MilestonesManager } from '@/components/students/milestones-manager';
 
 export const metadata: Metadata = { title: 'Student' };
@@ -185,6 +186,23 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
               ))}
             </div>
           )}
+        </Section>
+      )}
+
+      {/* ── Emergency card (sensitive) ───────────────────────── */}
+      {canPrivate && (priv?.emergencyContact || priv?.bloodType || priv?.doctorGp || detail?.phone || priv?.phone) && (
+        <Section title="Emergency" hint="Quick access — share or copy">
+          <EmergencyCard info={{
+            name: student.name,
+            university: detail?.university === '—' ? null : (detail?.university ?? null),
+            course: detail?.course ?? null,
+            phone: detail?.phone ?? priv?.phone ?? null,
+            address: priv?.address ?? detail?.accommodation?.address ?? null,
+            emergencyContact: priv?.emergencyContact ?? null,
+            bloodType: priv?.bloodType ?? null,
+            gp: priv?.doctorGp ?? null,
+            passportNumber: priv?.passportNumber ?? null,
+          }} />
         </Section>
       )}
 
