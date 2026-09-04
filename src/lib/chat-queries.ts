@@ -1,16 +1,9 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
-import { env } from '@/lib/env';
+import { signMediaMany } from '@/lib/signed-urls';
 import type { SystemRole } from '@/lib/permissions';
 import type { Message } from '@/lib/types';
 
-async function signMedia(path: string | null | undefined): Promise<string | null> {
-  if (!path) return null;
-  const supabase = await createClient();
-  if (!supabase) return null;
-  const { data } = await supabase.storage.from(env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET).createSignedUrl(path, 3600);
-  return data?.signedUrl ?? null;
-}
 
 export interface Conversation {
   id: string;
@@ -51,19 +44,23 @@ interface MsgRow {
 export async function getMessages(conversationId: string, meId?: string): Promise<Message[]> {
   const supabase = await createClient();
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('messages')
     .select('id, body, pinned, created_at, sender:family_members!messages_sender_id_fkey(display_name, role), attachments:message_attachments(storage_path, mime_type), reactions:message_reactions(emoji, member_id)')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
     .limit(200);
+  if (error) console.error('[getMessages]', error.code, error.message);
 
-  return Promise.all(((data ?? []) as unknown as (MsgRow & {
+  const msgRows = ((data ?? []) as unknown as (MsgRow & {
     attachments?: { storage_path: string; mime_type: string | null }[];
     reactions?: { emoji: string; member_id: string }[];
-  })[]).map(async (m) => {
+  })[]);
+  const signedUrls = await signMediaMany(msgRows.flatMap((m) => (m.attachments ?? []).map((a) => a.storage_path)));
+
+  return msgRows.map((m) => {
     const s = one<{ display_name: string; role: string }>(m.sender);
-    const attachments = await Promise.all((m.attachments ?? []).map(async (a) => ({ url: await signMedia(a.storage_path), mime: a.mime_type })));
+    const attachments = (m.attachments ?? []).map((a) => ({ url: signedUrls.get(a.storage_path) ?? null, mime: a.mime_type }));
     // Aggregate reactions by emoji.
     const byEmoji = new Map<string, { count: number; mine: boolean }>();
     for (const r of m.reactions ?? []) {
@@ -82,5 +79,5 @@ export async function getMessages(conversationId: string, meId?: string): Promis
       attachments,
       reactions: [...byEmoji.entries()].map(([emoji, v]) => ({ emoji, count: v.count, mine: v.mine })),
     };
-  }));
+  });
 }

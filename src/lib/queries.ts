@@ -6,16 +6,8 @@ import type {
 } from '@/lib/types';
 import type { SystemRole } from '@/lib/permissions';
 import { dueLabel } from '@/lib/utils';
-import { env } from '@/lib/env';
+import { signMedia, signMediaMany } from '@/lib/signed-urls';
 
-/** Sign a private media object (receipts live in the media bucket). */
-async function signMedia(path: string | null | undefined): Promise<string | null> {
-  if (!path) return null;
-  const supabase = await createClient();
-  if (!supabase) return null;
-  const { data } = await supabase.storage.from(env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET).createSignedUrl(path, 3600);
-  return data?.signedUrl ?? null;
-}
 
 /**
  * Live data access. Every read runs through the authenticated Supabase client,
@@ -50,19 +42,24 @@ export async function getFamilyMembers(familyId: string): Promise<Member[]> {
     .neq('status', 'disabled')
     .order('created_at', { ascending: true });
 
-  return Promise.all((data ?? []).map(async (m) => ({
-    id: m.id,
-    displayName: m.display_name,
-    role: m.role as SystemRole,
-    isStudent: m.is_student,
-    status: m.status,
-    inviteEmail: (m as { invite_email?: string | null }).invite_email ?? null,
-    linked: !!(m as { profile_id?: string | null }).profile_id,
-    avatarUrl: await signMedia((m as { avatar_path?: string | null }).avatar_path),
-    relationship:
-      (m.relationships as { relationship: string }[] | null)?.[0]?.relationship?.replace(/_/g, ' ') ??
-      (m.is_student ? 'Son' : 'Family'),
-  })));
+  const rows = data ?? [];
+  const avatars = await signMediaMany(rows.map((m) => (m as { avatar_path?: string | null }).avatar_path));
+  return rows.map((m) => {
+    const path = (m as { avatar_path?: string | null }).avatar_path;
+    return {
+      id: m.id,
+      displayName: m.display_name,
+      role: m.role as SystemRole,
+      isStudent: m.is_student,
+      status: m.status,
+      inviteEmail: (m as { invite_email?: string | null }).invite_email ?? null,
+      linked: !!(m as { profile_id?: string | null }).profile_id,
+      avatarUrl: path ? avatars.get(path) ?? null : null,
+      relationship:
+        (m.relationships as { relationship: string }[] | null)?.[0]?.relationship?.replace(/_/g, ' ') ??
+        (m.is_student ? 'Son' : 'Family'),
+    };
+  });
 }
 
 interface StudentRow {
@@ -193,12 +190,10 @@ export async function getTasks(familyId: string): Promise<Task[]> {
 
   const parents = rows.filter((t) => !(t as { parent_task_id?: string | null }).parent_task_id);
   // Sign attachments best-effort — a signing failure must not drop the task.
-  const signedUrls = await Promise.all(parents.map(async (t) => {
-    try { return await signMedia((t as { attachment_url?: string | null }).attachment_url); }
-    catch { return null; }
-  }));
+  const attachments = await signMediaMany(parents.map((t) => (t as { attachment_url?: string | null }).attachment_url));
 
-  return parents.map((t, i) => {
+  return parents.map((t) => {
+    const attachmentPath = (t as { attachment_url?: string | null }).attachment_url ?? null;
     const aId = (t as { assignee_id?: string | null }).assignee_id ?? null;
     const sId = (t as { student_id?: string | null }).student_id ?? null;
     const asg = assigneeByTask.get(t.id)
@@ -227,7 +222,7 @@ export async function getTasks(familyId: string): Promise<Task[]> {
       assigneeId: aId ?? assigneeIds[0] ?? null,
       assigneeIds,
       repeat: recurByTask.get(t.id) ?? 'none',
-      attachmentUrl: signedUrls[i] ?? null,
+      attachmentUrl: attachmentPath ? attachments.get(attachmentPath) ?? null : null,
       subtasks: subById.get(t.id) ?? [],
     };
   });
@@ -321,8 +316,11 @@ export async function getExpenses(familyId: string, student?: 'Hamza' | 'Omar'):
     .order('spent_on', { ascending: false })
     .limit(50);
 
-  const mapped = await Promise.all((data ?? []).map(async (e) => {
+  const expenseRows = data ?? [];
+  const receipts = await signMediaMany(expenseRows.map((e) => (e as { receipt_path?: string | null }).receipt_path));
+  const mapped = expenseRows.map((e) => {
     const name = one<{ member: { display_name: string } | null }>(e.student)?.member?.display_name;
+    const receiptPath = (e as { receipt_path?: string | null }).receipt_path ?? null;
     return {
       id: e.id,
       student: (name === 'Hamza' || name === 'Omar' ? name : 'Hamza') as 'Hamza' | 'Omar',
@@ -334,9 +332,9 @@ export async function getExpenses(familyId: string, student?: 'Hamza' | 'Omar'):
       fundingLabel: one<{ label: string }>(e.funding)?.label ?? 'Unassigned',
       studentId: (e as { student_id?: string | null }).student_id ?? null,
       spentOnDate: e.spent_on ?? null,
-      receiptUrl: await signMedia((e as { receipt_path?: string | null }).receipt_path),
+      receiptUrl: receiptPath ? receipts.get(receiptPath) ?? null : null,
     };
-  }));
+  });
   return mapped.filter((e) => !student || e.student === student);
 }
 

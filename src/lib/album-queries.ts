@@ -1,12 +1,6 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
-import { env } from '@/lib/env';
-
-async function sign(supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>, path: string | null | undefined): Promise<string | null> {
-  if (!path) return null;
-  const { data } = await supabase.storage.from(env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET).createSignedUrl(path, 3600);
-  return data?.signedUrl ?? null;
-}
+import { signMediaMany } from '@/lib/signed-urls';
 
 export interface AlbumSummary {
   id: string;
@@ -43,19 +37,23 @@ export async function getAlbums(familyId: string): Promise<AlbumSummary[]> {
     .order('updated_at', { ascending: false });
   if (error) { console.error('[getAlbums]', error.message); return []; }
 
-  return Promise.all((data ?? []).map(async (a) => {
+  // Pick each album's cover first, then sign every thumbnail in one request.
+  const rows = (data ?? []).map((a) => {
     const photos = (a as { photos?: { id: string; storage_path: string }[] }).photos ?? [];
     const cover = photos.find((p) => p.id === (a as { cover_photo_id?: string | null }).cover_photo_id) ?? photos[0];
-    return {
-      id: a.id,
-      title: a.title,
-      description: a.description ?? null,
-      coverUrl: await sign(supabase, cover?.storage_path),
-      count: photos.length,
-      updatedAt: a.updated_at
-        ? new Date(a.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-        : null,
-    };
+    return { a, photos, coverPath: cover?.storage_path ?? null };
+  });
+  const signed = await signMediaMany(rows.map((r) => r.coverPath));
+
+  return rows.map(({ a, photos, coverPath }) => ({
+    id: a.id,
+    title: a.title,
+    description: a.description ?? null,
+    coverUrl: coverPath ? signed.get(coverPath) ?? null : null,
+    count: photos.length,
+    updatedAt: a.updated_at
+      ? new Date(a.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      : null,
   }));
 }
 
@@ -77,12 +75,13 @@ export async function getAlbum(albumId: string): Promise<AlbumDetail | null> {
     .order('created_at', { ascending: false });
 
   const coverId = (album as { cover_photo_id?: string | null }).cover_photo_id ?? null;
-  const photos = await Promise.all((rows ?? []).map(async (p) => ({
+  const signed = await signMediaMany((rows ?? []).map((p) => p.storage_path));
+  const photos = (rows ?? []).map((p) => ({
     id: p.id,
-    url: await sign(supabase, p.storage_path),
+    url: signed.get(p.storage_path) ?? null,
     caption: p.caption ?? null,
     isCover: p.id === coverId,
-  })));
+  }));
 
   return {
     id: album.id,

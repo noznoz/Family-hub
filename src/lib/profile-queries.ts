@@ -1,6 +1,6 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
-import { env } from '@/lib/env';
+import { signMedia } from '@/lib/signed-urls';
 
 function one<T>(rel: unknown): T | null {
   if (!rel) return null;
@@ -36,14 +36,7 @@ export async function getMyProfile(memberId: string): Promise<MyProfile | null> 
     .maybeSingle();
   if (!member) return null;
 
-  let avatarUrl: string | null = null;
-  const avatarPath = (member as { avatar_path?: string | null }).avatar_path;
-  if (avatarPath) {
-    const { data: signed } = await supabase.storage
-      .from(env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET)
-      .createSignedUrl(avatarPath, 3600);
-    avatarUrl = signed?.signedUrl ?? null;
-  }
+  const avatarUrl = await signMedia((member as { avatar_path?: string | null }).avatar_path);
 
   let email: string | null = user?.email ?? (member as { invite_email?: string | null }).invite_email ?? null;
   let phone: string | null = null;

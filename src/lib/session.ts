@@ -1,7 +1,8 @@
 import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { isSupabaseConfigured, env } from '@/lib/env';
+import { isSupabaseConfigured } from '@/lib/env';
+import { signMedia } from '@/lib/signed-urls';
 import { demoMembers } from '@/lib/demo-data';
 import type { Permission, SystemRole } from '@/lib/permissions';
 import type { Member } from '@/lib/types';
@@ -78,14 +79,7 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
     for (const p of perms ?? []) overrides[p.permission_key as Permission] = p.granted;
 
     // Sign the profile picture (private bucket) for this request.
-    let avatarUrl: string | null = null;
-    const avatarPath = (data as { avatar_path?: string | null }).avatar_path;
-    if (avatarPath) {
-      const { data: signed } = await supabase.storage
-        .from(env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET)
-        .createSignedUrl(avatarPath, 3600);
-      avatarUrl = signed?.signedUrl ?? null;
-    }
+    const avatarUrl = await signMedia((data as { avatar_path?: string | null }).avatar_path);
 
     return {
       isDemo: false,

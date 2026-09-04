@@ -1,15 +1,14 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
-import { env } from '@/lib/env';
+import { signMediaMany } from '@/lib/signed-urls';
+
+/** Surface read failures in the server log — otherwise a broken query just
+ *  looks like "no data" and is very hard to diagnose in production. */
+function logError(tag: string, error: { code?: string; message: string } | null) {
+  if (error) console.error(`[${tag}]`, error.code ?? '', error.message);
+}
 import { dueLabel } from '@/lib/utils';
 
-async function signMedia(path: string | null | undefined): Promise<string | null> {
-  if (!path) return null;
-  const supabase = await createClient();
-  if (!supabase) return null;
-  const { data } = await supabase.storage.from(env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET).createSignedUrl(path, 3600);
-  return data?.signedUrl ?? null;
-}
 
 function one<T>(rel: unknown): T | null {
   if (!rel) return null;
@@ -35,11 +34,12 @@ export interface TripView {
 export async function getTrips(familyId: string): Promise<TripView[]> {
   const supabase = await createClient();
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('trips')
     .select('id, title, origin, destination, depart_at, dest_address, notes, members:trip_members(member:family_members!trip_members_member_id_fkey(id, display_name)), flights:flights(id, airline, flight_number, booking_ref, depart_airport, arrive_airport, depart_at, arrive_at, terminal, seat, baggage)')
     .eq('family_id', familyId)
     .order('depart_at', { ascending: true });
+  logError('getTrips', error);
   const now = Date.now();
   return (data ?? []).map((t) => {
     const members = ((t.members as unknown as { member: unknown }[] | null) ?? [])
@@ -90,13 +90,20 @@ export interface AccommodationView {
 export async function getAccommodations(familyId: string): Promise<AccommodationView[]> {
   const supabase = await createClient();
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('accommodations')
     .select('id, property, address, landlord, contact, start_date, end_date, monthly_rent, deposit, currency, student_id, wifi_info, utility_notes, maintenance_notes, contract_path, student:student_profiles(member:family_members!student_profiles_member_id_fkey(display_name)), photos:accommodation_photos(id, storage_path)')
     .eq('family_id', familyId)
     .order('start_date', { ascending: false });
+  logError('getAccommodations', error);
   const today = new Date().toISOString().slice(0, 10);
-  return Promise.all((data ?? []).map(async (a) => ({
+  const accRows = data ?? [];
+  // Contracts + every photo across all properties, signed in one request.
+  const signedUrls = await signMediaMany([
+    ...accRows.map((a) => (a as { contract_path?: string | null }).contract_path),
+    ...accRows.flatMap((a) => (((a as { photos?: { id: string; storage_path: string }[] }).photos) ?? []).map((p) => p.storage_path)),
+  ]);
+  return accRows.map((a) => ({
     id: a.id,
     property: a.property,
     address: a.address ?? '',
@@ -116,9 +123,9 @@ export async function getAccommodations(familyId: string): Promise<Accommodation
     wifiInfo: (a as { wifi_info?: string | null }).wifi_info ?? '',
     utilityNotes: (a as { utility_notes?: string | null }).utility_notes ?? '',
     maintenanceNotes: (a as { maintenance_notes?: string | null }).maintenance_notes ?? '',
-    contractUrl: await signMedia((a as { contract_path?: string | null }).contract_path),
-    photos: await Promise.all((((a as { photos?: { id: string; storage_path: string }[] }).photos) ?? []).map(async (p) => ({ id: p.id, url: await signMedia(p.storage_path) }))),
-  })));
+    contractUrl: (() => { const c = (a as { contract_path?: string | null }).contract_path; return c ? signedUrls.get(c) ?? null : null; })(),
+    photos: (((a as { photos?: { id: string; storage_path: string }[] }).photos) ?? []).map((p) => ({ id: p.id, url: signedUrls.get(p.storage_path) ?? null })),
+  }));
 }
 
 // ── University ────────────────────────────────────────────────────────────
@@ -129,10 +136,11 @@ export interface UniversityView {
 export async function getUniversityInfo(familyId: string): Promise<UniversityView[]> {
   const supabase = await createClient();
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('student_profiles')
     .select('id, course, student_ref, member:family_members!student_profiles_member_id_fkey(display_name), university:universities(name), years:academic_years(id, label, study_year, status, terms:academic_terms(id, name, start_date, end_date))')
     .eq('family_id', familyId);
+  logError('getUniversityInfo', error);
   return (data ?? []).map((s) => ({
     studentId: s.id,
     name: one<{ display_name: string }>(s.member)?.display_name ?? 'Student',
@@ -290,12 +298,13 @@ export interface NotificationView { id: string; kind: string; title: string; bod
 export async function getNotifications(memberId: string): Promise<NotificationView[]> {
   const supabase = await createClient();
   if (!supabase) return [];
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('notifications')
     .select('id, kind, title, body, read_at, created_at')
     .eq('recipient_id', memberId)
     .order('created_at', { ascending: false })
     .limit(50);
+  logError('getNotifications', error);
   return (data ?? []).map((n) => ({
     id: n.id,
     kind: n.kind,
