@@ -16,7 +16,7 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
 
 type State = 'checking' | 'unsupported' | 'ios-install' | 'idle' | 'enabling' | 'enabled' | 'denied' | 'error';
 
-export function EnableNotifications() {
+export function EnableNotifications({ hideWhenEnabled = false }: { hideWhenEnabled?: boolean }) {
   const [state, setState] = useState<State>('checking');
   const [error, setError] = useState<string | null>(null);
   const [tested, setTested] = useState(false);
@@ -67,6 +67,9 @@ export function EnableNotifications() {
   const test = async () => { await sendTestPush(); setTested(true); setTimeout(() => setTested(false), 4000); };
 
   if (state === 'checking') return null;
+  // On Home we only want this to appear when action is needed — hide it once
+  // notifications are on (or can't be offered here).
+  if (hideWhenEnabled && (state === 'enabled' || state === 'unsupported' || state === 'denied')) return null;
 
   if (state === 'ios-install') {
     return (

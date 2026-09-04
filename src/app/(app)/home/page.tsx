@@ -7,6 +7,8 @@ import { demoStudents, demoAttention } from '@/lib/demo-data';
 import { StudentCard } from '@/components/home/student-card';
 import { AttentionList } from '@/components/home/attention-list';
 import { WorldClocks } from '@/components/home/world-clocks';
+import { NotifyFamily } from '@/components/home/notify-family';
+import { EnableNotifications } from '@/components/pwa/enable-notifications';
 import { NextPrayerCard } from '@/components/prayer/next-prayer-card';
 import { SectionTitle } from '@/components/ui/section-title';
 import { Card } from '@/components/ui/card';
@@ -39,7 +41,10 @@ export default async function HomePage() {
       </div>
 
       <WorldClocks />
+      <EnableNotifications hideWhenEnabled />
       <NextPrayerCard />
+
+      {(member.role === 'admin' || member.role === 'parent') && <NotifyFamily live={!session.isDemo} />}
 
       {summary && <DashboardStrip summary={summary} />}
 
@@ -90,6 +95,7 @@ function StudentHome({ name, student }: { name: string; student: StudentSummary 
       </div>
 
       <WorldClocks />
+      <EnableNotifications hideWhenEnabled />
       <NextPrayerCard />
 
       <div className="grid grid-cols-2 gap-3">
